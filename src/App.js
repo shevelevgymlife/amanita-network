@@ -1,5 +1,31 @@
 import { useState, useEffect } from "react";
 import { ethers } from "ethers";
+import { createAppKit } from "@reown/appkit";
+import { EthersAdapter } from "@reown/appkit-adapter-ethers";
+
+const projectId = process.env.REACT_APP_WC_PROJECT_ID;
+
+const decimalChain = {
+  id: 75,
+  name: "Decimal Smart Chain",
+  network: "decimal",
+  nativeCurrency: { name: "DEL", symbol: "DEL", decimals: 18 },
+  rpcUrls: { default: { http: ["https://node.decimalchain.com/web3/"] } },
+};
+
+const modal = createAppKit({
+  adapters: [new EthersAdapter()],
+  projectId,
+  networks: [decimalChain],
+  defaultNetwork: decimalChain,
+  metadata: {
+    name: "Amanita Network",
+    description: "Amanita Network",
+    url: "https://amanita-network.onrender.com",
+    icons: ["https://amanita-network.onrender.com/favicon.ico"]
+  },
+  features: { email: false, socials: false }
+});
 
 const REPUTATION_ADDRESS = "0xdb62AD6F2f4bb1c5D230aCeaCb937530746C5e13";
 const SHEVELEV_ADDRESS = "0xb5c1933b1fa015818ac2c53812f67611c48e6b56";
@@ -15,13 +41,6 @@ const REPUTATION_ABI = [
 const SHEVELEV_ABI = [
   "function balanceOf(address) view returns (uint256)"
 ];
-
-const DECIMAL_CHAIN = {
-  chainId: "0x4b",
-  chainName: "Decimal Smart Chain",
-  rpcUrls: ["https://node.decimalchain.com/web3/"],
-  nativeCurrency: { name: "DEL", symbol: "DEL", decimals: 18 }
-};
 
 const TIERS = {
   1: { name: "Зерно", icon: "🌱", color: "#6b7280", min: "0" },
@@ -52,36 +71,24 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  async function connect() {
-    if (!window.ethereum) {
-      window.location.href = `https://metamask.app.link/dapp/${window.location.host}`;
-      return;
-    }
-    try {
-      await window.ethereum.request({
-        method: "wallet_addEthereumChain",
-        params: [DECIMAL_CHAIN]
-      });
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-      setAccount(accounts[0]);
-      await loadUser(accounts[0]);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  function disconnect() {
-    setAccount(null);
-    setTier(null);
-    setBalance(null);
-    setNickname("");
-    setRegistered(false);
-    setPage("home");
-  }
+  useEffect(() => {
+    modal.subscribeAccount(async (acc) => {
+      if (acc.address) {
+        setAccount(acc.address);
+        await loadUser(acc.address);
+      } else {
+        setAccount(null);
+        setTier(null);
+        setBalance(null);
+        setNickname("");
+        setRegistered(false);
+      }
+    });
+  }, []);
 
   async function loadUser(addr) {
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      const provider = new ethers.JsonRpcProvider("https://node.decimalchain.com/web3/");
       const rep = new ethers.Contract(REPUTATION_ADDRESS, REPUTATION_ABI, provider);
       const shev = new ethers.Contract(SHEVELEV_ADDRESS, SHEVELEV_ABI, provider);
       const [t, bal, isReg] = await Promise.all([
@@ -102,7 +109,8 @@ export default function App() {
     if (!inputNick) return;
     setLoading(true);
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      const walletProvider = modal.getWalletProvider();
+      const provider = new ethers.BrowserProvider(walletProvider);
       const signer = await provider.getSigner();
       const rep = new ethers.Contract(REPUTATION_ADDRESS, REPUTATION_ABI, signer);
       const tx = await rep.register(inputNick, 0);
@@ -151,12 +159,8 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", background: "#070908", color: "#e8dcc8", fontFamily: "'Rubik', sans-serif", fontWeight: 700 }}>
 
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@700&display=swap');
-        * { font-family: 'Rubik', sans-serif !important; font-weight: 700 !important; }
-      `}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@700&display=swap'); * { font-family: 'Rubik', sans-serif !important; font-weight: 700 !important; }`}</style>
 
-      {/* HEADER */}
       <div style={{ background: "#0c0f0a", borderBottom: "1px solid #181e12", padding: "1rem 1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }}>
         <div onClick={() => navigate("home")} style={{ fontSize: "1.4rem", color: "#00c4a0", cursor: "pointer" }}>🍄 AMANITA</div>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
@@ -173,7 +177,7 @@ export default function App() {
                   </div>
                 ))}
                 {account && (
-                  <div onClick={disconnect} style={{ padding: "0.75rem 1rem", cursor: "pointer", color: "#ef4444", display: "flex", alignItems: "center", gap: "0.5rem" }}
+                  <div onClick={() => { modal.disconnect(); setMenuOpen(false); setPage("home"); }} style={{ padding: "0.75rem 1rem", cursor: "pointer", color: "#ef4444", display: "flex", alignItems: "center", gap: "0.5rem" }}
                     onMouseEnter={e => e.currentTarget.style.background = "#181e12"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                     <span>🚪</span><span>Выйти</span>
@@ -185,14 +189,13 @@ export default function App() {
         </div>
       </div>
 
-      {/* MAIN */}
       <div style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem 1rem" }}>
 
         {page === "home" && (
           <div>
             <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-              <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>🍄</div>
-              <h1 style={{ fontSize: "2rem", color: "#fff", margin: "0 0 1rem" }}>Amanita Network</h1>
+              <div style={{ fontSize: "3rem" }}>🍄</div>
+              <h1 style={{ fontSize: "2rem", color: "#fff", margin: "0.5rem 0 1rem" }}>Amanita Network</h1>
             </div>
 
             {!account && (
@@ -200,24 +203,24 @@ export default function App() {
                 <div style={{ background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", padding: "1.5rem", marginBottom: "1.5rem" }}>
                   <h3 style={{ color: "#00c4a0", marginBottom: "1rem" }}>Как войти?</h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                    <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+                    <div style={{ display: "flex", gap: "1rem" }}>
                       <span style={{ fontSize: "1.5rem" }}>💻</span>
                       <div>
                         <div style={{ color: "#fff" }}>Через браузер</div>
-                        <div style={{ color: "#b0a490", fontSize: "0.85rem", fontWeight: 400 }}>Установите расширение MetaMask для Chrome, Edge или Firefox.</div>
+                        <div style={{ color: "#b0a490", fontSize: "0.85rem" }}>Установите расширение MetaMask для Chrome, Edge или Firefox.</div>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+                    <div style={{ display: "flex", gap: "1rem" }}>
                       <span style={{ fontSize: "1.5rem" }}>📱</span>
                       <div>
                         <div style={{ color: "#fff" }}>Через телефон</div>
-                        <div style={{ color: "#b0a490", fontSize: "0.85rem", fontWeight: 400 }}>Установите приложение MetaMask. Кнопка ниже откроет его автоматически.</div>
+                        <div style={{ color: "#b0a490", fontSize: "0.85rem" }}>Установите MetaMask на телефон. Нажмите "Войти" — появится QR код для сканирования.</div>
                       </div>
                     </div>
                   </div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <button onClick={connect} style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "1rem 2rem", borderRadius: "4px", cursor: "pointer", fontSize: "1.1rem" }}>
+                  <button onClick={() => modal.open()} style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "1rem 2rem", borderRadius: "4px", cursor: "pointer", fontSize: "1.1rem" }}>
                     🦊 Войти
                   </button>
                 </div>
@@ -271,7 +274,7 @@ export default function App() {
           <div>
             <h2 style={{ color: "#fff" }}>👤 Моя страница</h2>
             {!account
-              ? <div style={{ color: "#b0a490" }}>Подключите MetaMask для просмотра профиля.</div>
+              ? <div style={{ color: "#b0a490" }}>Подключите кошелёк для просмотра профиля.</div>
               : <div style={{ background: "#0c0f0a", border: "1px solid #181e12", borderRadius: "4px", padding: "1.5rem" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
                     <div style={{ fontSize: "3rem" }}>{tierInfo?.icon || "🌱"}</div>
@@ -320,22 +323,17 @@ export default function App() {
             <div style={{ background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", padding: "1.5rem", marginBottom: "1.5rem" }}>
               <h3 style={{ color: "#00c4a0", marginBottom: "1rem" }}>Как попасть в рейтинг?</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                <div style={{ display: "flex", gap: "0.75rem" }}>
-                  <span style={{ color: "#00c4a0" }}>1.</span>
-                  <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>Установите <span style={{ color: "#fff" }}>MetaMask</span> — расширение для браузера или приложение на телефон</div>
-                </div>
-                <div style={{ display: "flex", gap: "0.75rem" }}>
-                  <span style={{ color: "#00c4a0" }}>2.</span>
-                  <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>Добавьте сеть <span style={{ color: "#fff" }}>Decimal Smart Chain</span> — при входе на сайт это произойдёт автоматически</div>
-                </div>
-                <div style={{ display: "flex", gap: "0.75rem" }}>
-                  <span style={{ color: "#00c4a0" }}>3.</span>
-                  <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>Получите токены <span style={{ color: "#fff" }}>SHEVELEV</span> — чем больше токенов SHEVELEV на кошельке, тем выше уровень</div>
-                </div>
-                <div style={{ display: "flex", gap: "0.75rem" }}>
-                  <span style={{ color: "#00c4a0" }}>4.</span>
-                  <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>Чтобы увидеть токены SHEVELEV в MetaMask — импортируйте токен по адресу: <span style={{ color: "#00c4a0", fontSize: "0.75rem", wordBreak: "break-all" }}>0xb5c1933b1fa015818ac2c53812f67611c48e6b56</span></div>
-                </div>
+                {[
+                  ["1.", "Установите MetaMask — расширение для браузера или приложение на телефон"],
+                  ["2.", "Добавьте сеть Decimal Smart Chain — при входе на сайт это произойдёт автоматически"],
+                  ["3.", "Получите токены SHEVELEV — чем больше токенов на кошельке, тем выше уровень"],
+                  ["4.", "Импортируйте токен SHEVELEV в MetaMask по адресу: 0xb5c1933b1fa015818ac2c53812f67611c48e6b56"]
+                ].map(([num, text]) => (
+                  <div key={num} style={{ display: "flex", gap: "0.75rem" }}>
+                    <span style={{ color: "#00c4a0" }}>{num}</span>
+                    <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>{text}</div>
+                  </div>
+                ))}
               </div>
             </div>
             {leaderboard.length === 0
