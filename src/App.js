@@ -84,8 +84,7 @@ const S = {
 function daysAgo(date) { return Math.floor((Date.now() - new Date(date)) / 86400000); }
 function formatDate(date) { return new Date(date).toLocaleDateString("ru-RU"); }
 
-// ===== КОМПОНЕНТ ПОСТОВ =====
-function PostCard({ post, account, onReload, isOwner, allUsers }) {
+function PostCard({ post, account, onReload, isOwner }) {
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
@@ -111,7 +110,7 @@ function PostCard({ post, account, onReload, isOwner, allUsers }) {
 
   async function submitComment() {
     if (!newComment || !account) return;
-    await fetch(`${API}/api/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ post_id: post.id, parent_id: replyTo?.id || null, address: account, content: replyTo ? `@${replyTo.nickname || replyTo.address.slice(0,8)} ${newComment}` : newComment }) });
+    await fetch(`${API}/api/comments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ post_id: post.id, parent_id: replyTo?.id || null, address: account, content: replyTo ? `@${replyTo.nickname || replyTo.address?.slice(0,8)} ${newComment}` : newComment }) });
     setNewComment(""); setReplyTo(null);
     await loadComments();
   }
@@ -156,12 +155,10 @@ function PostCard({ post, account, onReload, isOwner, allUsers }) {
     await fetch(`${API}/api/post-likes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ address: account, post_id: post.id, type }) });
   }
 
-  const avatarEmoji = AVATARS[post.avatar_index || 0]?.emoji || "🧘";
-
   return (
     <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: "12px", padding: "1rem", marginBottom: "0.75rem", border: "1px solid rgba(255,255,255,0.06)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.75rem" }}>
-        <span style={{ fontSize: "1.3rem" }}>{avatarEmoji}</span>
+        <span style={{ fontSize: "1.3rem" }}>{AVATARS[post.avatar_index || 0]?.emoji}</span>
         <div style={{ flex: 1 }}>
           <span style={{ color: "#00c4a0", fontWeight: 700, fontSize: "0.85rem" }}>{post.nickname || post.address?.slice(0,8)+"..."}</span>
           <span style={{ color: "#64748b", fontSize: "0.75rem", marginLeft: "0.5rem" }}>{formatDate(post.created_at)}</span>
@@ -191,7 +188,7 @@ function PostCard({ post, account, onReload, isOwner, allUsers }) {
         </>
       )}
 
-      <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
         <button onClick={() => handleLike("like")} style={{ ...S.btnSm, color: myLike === "like" ? "#4ade80" : "#e2e8f0", borderColor: myLike === "like" ? "#4ade80" : "rgba(255,255,255,0.1)" }}>👍 {likes}</button>
         <button onClick={() => handleLike("dislike")} style={{ ...S.btnSm, color: myLike === "dislike" ? "#f87171" : "#e2e8f0", borderColor: myLike === "dislike" ? "#f87171" : "rgba(255,255,255,0.1)" }}>👎 {dislikes}</button>
         <button onClick={toggleComments} style={S.btnSm}>💬 {post.comment_count || 0}</button>
@@ -205,7 +202,6 @@ function PostCard({ post, account, onReload, isOwner, allUsers }) {
                 <span>{AVATARS[c.avatar_index || 0]?.emoji}</span>
                 <span style={{ color: "#00c4a0", fontSize: "0.85rem", fontWeight: 700 }}>{c.nickname || c.address?.slice(0,8)+"..."}</span>
                 <span style={{ color: "#64748b", fontSize: "0.75rem" }}>{formatDate(c.created_at)}</span>
-                {c.updated_at !== c.created_at && <span style={{ color: "#64748b", fontSize: "0.7rem" }}>(ред.)</span>}
                 <div style={{ marginLeft: "auto", display: "flex", gap: "0.3rem" }}>
                   <button onClick={() => setReplyTo(c)} style={{ ...S.btnSm, fontSize: "0.7rem", padding: "0.2rem 0.5rem" }}>↩️</button>
                   {(account === c.address || isOwner) && (
@@ -227,17 +223,16 @@ function PostCard({ post, account, onReload, isOwner, allUsers }) {
               )}
             </div>
           ))}
-
           {account && (
             <div>
               {replyTo && (
                 <div style={{ color: "#00c4a0", fontSize: "0.8rem", marginBottom: "0.3rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                   ↩️ Ответ для {replyTo.nickname || replyTo.address?.slice(0,8)+"..."}
-                  <button onClick={() => setReplyTo(null)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "0.8rem" }}>✕</button>
+                  <button onClick={() => setReplyTo(null)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer" }}>✕</button>
                 </div>
               )}
               <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder={replyTo ? "Ваш ответ..." : "Комментарий..."} style={{ ...S.input, fontSize: "0.85rem" }} onKeyDown={e => e.key === "Enter" && submitComment()} />
+                <input value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Комментарий..." style={{ ...S.input, fontSize: "0.85rem" }} onKeyDown={e => e.key === "Enter" && submitComment()} />
                 <button onClick={submitComment} style={S.btn}>→</button>
               </div>
             </div>
@@ -248,7 +243,6 @@ function PostCard({ post, account, onReload, isOwner, allUsers }) {
   );
 }
 
-// ===== СТРАНИЦА ПОЛЬЗОВАТЕЛЯ =====
 function UserPage({ address, account, myVotes, onVote, onBack }) {
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -257,9 +251,7 @@ function UserPage({ address, account, myVotes, onVote, onBack }) {
   const [tier, setTier] = useState(null);
   const [balance, setBalance] = useState(null);
 
-  useEffect(() => {
-    loadData();
-  }, [address]);
+  useEffect(() => { loadData(); }, [address]);
 
   async function loadData() {
     try {
@@ -293,7 +285,6 @@ function UserPage({ address, account, myVotes, onVote, onBack }) {
   return (
     <div>
       <button onClick={onBack} style={{ ...S.btnSm, marginBottom: "1rem" }}>← Назад</button>
-
       <div style={S.card}>
         <div style={{ display: "flex", gap: "1.5rem", alignItems: "flex-start", flexWrap: "wrap" }}>
           <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: `linear-gradient(135deg,${tierInfo?.color || "#9ca3af"}33,#0f1117)`, border: `2px solid ${tierInfo?.color || "#9ca3af"}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.5rem", flexShrink: 0 }}>
@@ -303,20 +294,16 @@ function UserPage({ address, account, myVotes, onVote, onBack }) {
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
               <span style={{ color: "#fff", fontSize: "1.3rem", fontWeight: 700 }}>{user.nickname || address.slice(0,8)+"..."}</span>
               <span style={{ color: tierInfo?.color || "#9ca3af", background: (tierInfo?.color || "#9ca3af") + "20", padding: "0.2rem 0.6rem", borderRadius: "20px", fontSize: "0.8rem" }}>{tierInfo?.icon} {tierInfo?.name || "Зерно"}</span>
-              {user.gender && <span style={{ color: "#64748b", fontSize: "0.85rem" }}>{user.gender === "male" ? "♂️" : "♀️"}</span>}
             </div>
             {user.status && <div style={{ color: "#94a3b8", fontStyle: "italic", marginBottom: "0.5rem" }}>"{user.status}"</div>}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", fontSize: "0.85rem", color: "#64748b" }}>
               <span>{MUSHROOMS[user.mushroom_type || "red"]}</span>
               <span>📅 Стаж: {user.experience_days || 0} дней</span>
-              <span>🗓 На платформе: {daysAgo(user.joined_at)} дней</span>
-              <span>📝 Постов: {user.post_count || 0}</span>
-              <span>💬 Комментариев: {user.comment_count || 0}</span>
+              <span>🗓 {daysAgo(user.joined_at)} дней на платформе</span>
+              <span>📝 {user.post_count || 0} постов</span>
+              <span>⭐ {user.vote_count || 0} голосов</span>
             </div>
-            <div style={{ marginTop: "0.5rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-              <span style={{ color: "#64748b", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} SHEVELEV</span>
-              <span style={{ color: "#fbbf24", fontSize: "0.85rem" }}>⭐ {user.vote_count || 0} голосов</span>
-            </div>
+            <div style={{ marginTop: "0.5rem", color: "#64748b", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} SHEVELEV</div>
           </div>
           {!isMe && account && (
             <button onClick={() => onVote(address, hasVoted)} style={{ ...S.btnSm, borderColor: hasVoted ? "#fbbf24" : "rgba(255,255,255,0.1)", color: hasVoted ? "#fbbf24" : "#e2e8f0" }}>
@@ -325,10 +312,9 @@ function UserPage({ address, account, myVotes, onVote, onBack }) {
           )}
         </div>
       </div>
-
       <div style={{ ...S.card, marginTop: "1rem" }}>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-          <button onClick={() => loadPostsByFolder(null)} style={{ ...S.btnSm, borderColor: !selectedFolder ? "#00c4a0" : "rgba(255,255,255,0.1)", color: !selectedFolder ? "#00c4a0" : "#e2e8f0" }}>Все посты</button>
+          <button onClick={() => loadPostsByFolder(null)} style={{ ...S.btnSm, borderColor: !selectedFolder ? "#00c4a0" : "rgba(255,255,255,0.1)", color: !selectedFolder ? "#00c4a0" : "#e2e8f0" }}>Все</button>
           {folders.map(f => (
             <button key={f.id} onClick={() => loadPostsByFolder(f.id)} style={{ ...S.btnSm, borderColor: selectedFolder === f.id ? "#00c4a0" : "rgba(255,255,255,0.1)", color: selectedFolder === f.id ? "#00c4a0" : "#e2e8f0" }}>📁 {f.name}</button>
           ))}
@@ -342,7 +328,6 @@ function UserPage({ address, account, myVotes, onVote, onBack }) {
   );
 }
 
-// ===== ГЛАВНЫЙ КОМПОНЕНТ =====
 export default function App() {
   const [account, setAccount] = useState(null);
   const [tier, setTier] = useState(null);
@@ -366,6 +351,8 @@ export default function App() {
   const [profileForm, setProfileForm] = useState({ nickname: "", avatar_index: 0, gender: "", mushroom_type: "red", experience_days: 0, status: "" });
   const [myVotes, setMyVotes] = useState([]);
   const [viewingUser, setViewingUser] = useState(null);
+  const [topByTokens, setTopByTokens] = useState([]);
+  const [topByVotes, setTopByVotes] = useState([]);
 
   useEffect(() => {
     modal.subscribeAccount(async (acc) => {
@@ -380,6 +367,7 @@ export default function App() {
     });
     loadTotalUsers();
     loadFeed();
+    loadRatings();
   }, []);
 
   useEffect(() => {
@@ -423,6 +411,29 @@ export default function App() {
       const data = await r.json();
       setTotalUsers(data.length);
     } catch (e) { setTotalUsers(0); }
+  }
+
+  async function loadRatings() {
+    try {
+      const r = await fetch(`${API}/api/users`);
+      const users = await r.json();
+
+      // Топ по голосам
+      const byVotes = [...users].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0)).slice(0, 5);
+      setTopByVotes(byVotes);
+
+      // Топ по токенам — загружаем балансы
+      const provider = new ethers.JsonRpcProvider("https://node.decimalchain.com/web3/");
+      const shev = new ethers.Contract(SHEVELEV_ADDRESS, SHEVELEV_ABI, provider);
+      const withBalances = await Promise.all(users.map(async u => {
+        try {
+          const bal = await shev.balanceOf(u.address);
+          return { ...u, shevelev: parseFloat(ethers.formatEther(bal)) };
+        } catch { return { ...u, shevelev: 0 }; }
+      }));
+      const byTokens = [...withBalances].sort((a, b) => b.shevelev - a.shevelev).slice(0, 5);
+      setTopByTokens(byTokens);
+    } catch (e) { console.error(e); }
   }
 
   async function loadFeed() {
@@ -503,6 +514,7 @@ export default function App() {
       setMyVotes(prev => [...prev, targetAddress.toLowerCase()]);
     }
     await loadAllUsers();
+    await loadRatings();
   }
 
   function navigate(id) { setPage(id); setMenuOpen(false); setViewingUser(null); if (id === "others") loadAllUsers(); if (id === "feed") loadFeed(); }
@@ -519,7 +531,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* HEADER */}
       <div style={S.header}>
         <div onClick={() => navigate("home")} style={{ fontSize: "1.3rem", color: "#fff", cursor: "pointer" }}>
           🍄 <span style={{ background: "linear-gradient(135deg,#00c4a0,#0099cc)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>AMANITA</span>
@@ -545,21 +556,22 @@ export default function App() {
 
       <div style={{ maxWidth: "900px", margin: "0 auto", padding: "2rem 1.5rem", position: "relative", zIndex: 1 }}>
 
-        {/* ГЛАВНАЯ */}
         {page === "home" && (
           <div>
-            <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+            <div style={{ textAlign: "center", marginBottom: "2rem" }}>
               <div style={{ fontSize: "4rem", marginBottom: "1rem", filter: "drop-shadow(0 0 30px rgba(0,196,160,0.3))" }}>🍄</div>
               <h1 style={{ fontSize: "clamp(2rem,5vw,3.5rem)", fontWeight: 900, color: "#fff", letterSpacing: "-1px", lineHeight: 1.1, marginBottom: "1rem" }}>
                 Amanita<br/><span style={{ background: "linear-gradient(135deg,#00c4a0,#0099cc)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Network</span>
               </h1>
-              <p style={{ color: "#94a3b8", fontSize: "1.1rem", maxWidth: "400px", margin: "0 auto 2rem" }}>Открытая децентрализованная сеть для обмена опытом</p>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: "1.5rem", background: "rgba(0,196,160,0.08)", border: "1px solid rgba(0,196,160,0.2)", borderRadius: "16px", padding: "1.2rem 2.5rem", marginBottom: "2rem" }}>
+              <p style={{ color: "#94a3b8", fontSize: "1.1rem", maxWidth: "400px", margin: "0 auto 1.5rem" }}>Открытая децентрализованная сеть для обмена опытом</p>
+
+              <div style={{ display: "inline-flex", alignItems: "center", background: "rgba(0,196,160,0.08)", border: "1px solid rgba(0,196,160,0.2)", borderRadius: "16px", padding: "1.2rem 2.5rem", marginBottom: "1.5rem" }}>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: "2.8rem", fontWeight: 900, color: "#00c4a0", lineHeight: 1 }}>{displayCount}</div>
                   <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "0.3rem" }}>участников в сети</div>
                 </div>
               </div>
+
               {!account && (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
                   <button onClick={() => modal.open()} style={{ ...S.btn, padding: "0.9rem 2.5rem", fontSize: "1rem", borderRadius: "12px", boxShadow: "0 0 30px rgba(0,196,160,0.3)" }}>🦊 Войти через MetaMask</button>
@@ -569,21 +581,63 @@ export default function App() {
             </div>
 
             {account && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <div style={{ ...S.card, display: "flex", alignItems: "center", gap: "1.5rem" }}>
-                  <div style={{ fontSize: "3rem" }}>{AVATARS[profile?.avatar_index || 0]?.emoji}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: tierInfo?.color || "#9ca3af", fontSize: "1.1rem", fontWeight: 700 }}>{profile?.nickname || "Без ника"} · {tierInfo?.name || "Зерно"}</div>
-                    <div style={{ color: "#64748b", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} SHEVELEV · ⭐ {profile?.vote_count || 0} голосов</div>
-                    {profile?.status && <div style={{ color: "#94a3b8", fontSize: "0.85rem", marginTop: "0.3rem" }}>"{profile.status}"</div>}
-                  </div>
-                  <button onClick={() => navigate("profile")} style={S.btnSm}>Мой профиль</button>
+              <div style={{ ...S.card, display: "flex", alignItems: "center", gap: "1.5rem", marginBottom: "1.5rem" }}>
+                <div style={{ fontSize: "3rem" }}>{AVATARS[profile?.avatar_index || 0]?.emoji}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: tierInfo?.color || "#9ca3af", fontSize: "1.1rem", fontWeight: 700 }}>{profile?.nickname || "Без ника"} · {tierInfo?.name || "Зерно"}</div>
+                  <div style={{ color: "#64748b", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} SHEVELEV · ⭐ {profile?.vote_count || 0} голосов</div>
+                  {profile?.status && <div style={{ color: "#94a3b8", fontSize: "0.85rem", marginTop: "0.3rem" }}>"{profile.status}"</div>}
                 </div>
+                <button onClick={() => navigate("profile")} style={S.btnSm}>Мой профиль</button>
               </div>
             )}
 
+            {/* РЕЙТИНГИ */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+
+              {/* ТОП ПО ТОКЕНАМ */}
+              <div style={S.card}>
+                <h3 style={{ color: "#fbbf24", marginBottom: "1rem", fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  🪙 Топ по токенам SHEVELEV
+                </h3>
+                {topByTokens.length === 0
+                  ? <div style={{ color: "#64748b", fontSize: "0.85rem", textAlign: "center", padding: "1rem" }}>Загрузка...</div>
+                  : topByTokens.map((u, i) => (
+                    <div key={u.address} onClick={() => { setViewingUser(u.address); navigate("others"); }} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.6rem 0", borderBottom: i < topByTokens.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none", cursor: "pointer" }}>
+                      <span style={{ color: i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7f32" : "#64748b", fontWeight: 700, width: "20px", fontSize: "0.9rem" }}>#{i+1}</span>
+                      <span style={{ fontSize: "1.2rem" }}>{AVATARS[u.avatar_index || 0]?.emoji}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: "#fff", fontSize: "0.85rem", fontWeight: 700 }}>{u.nickname || u.address.slice(0,8)+"..."}</div>
+                        <div style={{ color: "#64748b", fontSize: "0.75rem" }}>{(u.shevelev || 0).toLocaleString()} SHEVELEV</div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+
+              {/* ТОП ПО ГОЛОСАМ */}
+              <div style={S.card}>
+                <h3 style={{ color: "#c084fc", marginBottom: "1rem", fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  ⭐ Топ по голосам
+                </h3>
+                {topByVotes.length === 0
+                  ? <div style={{ color: "#64748b", fontSize: "0.85rem", textAlign: "center", padding: "1rem" }}>Загрузка...</div>
+                  : topByVotes.map((u, i) => (
+                    <div key={u.address} onClick={() => { setViewingUser(u.address); navigate("others"); }} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.6rem 0", borderBottom: i < topByVotes.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none", cursor: "pointer" }}>
+                      <span style={{ color: i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7f32" : "#64748b", fontWeight: 700, width: "20px", fontSize: "0.9rem" }}>#{i+1}</span>
+                      <span style={{ fontSize: "1.2rem" }}>{AVATARS[u.avatar_index || 0]?.emoji}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: "#fff", fontSize: "0.85rem", fontWeight: 700 }}>{u.nickname || u.address.slice(0,8)+"..."}</div>
+                        <div style={{ color: "#64748b", fontSize: "0.75rem" }}>⭐ {u.vote_count || 0} голосов</div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+
             {!account && (
-              <div style={{ ...S.card, marginTop: "2rem" }}>
+              <div style={S.card}>
                 <h3 style={{ color: "#00c4a0", marginBottom: "1rem", fontSize: "0.95rem" }}>Как войти?</h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                   <div style={{ display: "flex", gap: "1rem" }}><span style={{ fontSize: "1.5rem" }}>💻</span><div><div style={{ color: "#fff", fontSize: "0.9rem" }}>Через браузер</div><div style={{ color: "#64748b", fontSize: "0.85rem" }}>Установите расширение MetaMask для Chrome, Edge или Firefox.</div></div></div>
@@ -594,7 +648,6 @@ export default function App() {
           </div>
         )}
 
-        {/* МОЯ СТРАНИЦА */}
         {page === "profile" && (
           <div>
             <h2 style={{ color: "#fff", marginBottom: "1.5rem", fontWeight: 900 }}>👤 Моя страница</h2>
@@ -615,8 +668,8 @@ export default function App() {
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", fontSize: "0.85rem", color: "#64748b" }}>
                           <span>{MUSHROOMS[profile?.mushroom_type || "red"]}</span>
                           <span>📅 Стаж: {profile?.experience_days || 0} дней</span>
-                          <span>🗓 На платформе: {profile ? daysAgo(profile.joined_at) : 0} дней</span>
-                          <span>📝 Постов: {profile?.post_count || 0}</span>
+                          <span>🗓 {profile ? daysAgo(profile.joined_at) : 0} дней на платформе</span>
+                          <span>📝 {profile?.post_count || 0} постов</span>
                           <span>⭐ {profile?.vote_count || 0} голосов</span>
                         </div>
                         <div style={{ marginTop: "0.5rem", color: "#64748b", fontSize: "0.8rem" }}>{parseFloat(balance || 0).toLocaleString()} SHEVELEV</div>
@@ -704,7 +757,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ЛЕНТА */}
         {page === "feed" && (
           <div>
             <h2 style={{ color: "#fff", marginBottom: "1.5rem", fontWeight: 900 }}>📝 Лента</h2>
@@ -715,7 +767,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ЧАТЫ */}
         {page === "chats" && (
           <div>
             <h2 style={{ color: "#fff", marginBottom: "1.5rem", fontWeight: 900 }}>💬 Чаты</h2>
@@ -723,7 +774,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ДРУГИЕ */}
         {page === "others" && (
           <div>
             {viewingUser
@@ -738,7 +788,7 @@ export default function App() {
                         <div style={{ fontSize: "1.5rem" }}>{AVATARS[u.avatar_index || 0]?.emoji}</div>
                         <div style={{ flex: 1 }}>
                           <div style={{ color: "#00c4a0", fontWeight: 700 }}>{u.nickname || u.address.slice(0,8)+"..."}</div>
-                          <div style={{ color: "#64748b", fontSize: "0.8rem" }}>⭐ {u.vote_count || 0} голосов · 📝 {u.post_count || 0} постов · 🗓 {daysAgo(u.joined_at)} дней</div>
+                          <div style={{ color: "#64748b", fontSize: "0.8rem" }}>⭐ {u.vote_count || 0} · 📝 {u.post_count || 0} · 🗓 {daysAgo(u.joined_at)} дней</div>
                         </div>
                         <span style={{ color: "#64748b", fontSize: "0.8rem" }}>→</span>
                       </div>
@@ -749,7 +799,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ДИСКЛЕЙМЕР */}
         {page === "disclaimer" && (
           <div>
             <h2 style={{ color: "#fff", marginBottom: "1.5rem", fontWeight: 900 }}>⚠️ Дисклеймер</h2>
@@ -770,3 +819,4 @@ export default function App() {
     </div>
   );
 }
+
