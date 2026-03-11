@@ -24,7 +24,7 @@ const modal = createAppKit({
     url: "https://amanita-network.onrender.com",
     icons: ["https://amanita-network.onrender.com/favicon.ico"]
   },
-  features: { email: true, socials: ["google"] }
+  features: { email: false, socials: false }
 });
 
 const REPUTATION_ADDRESS = "0xdb62AD6F2f4bb1c5D230aCeaCb937530746C5e13";
@@ -35,8 +35,7 @@ const REPUTATION_ABI = [
   "function register(string nickname, uint8 avatarIndex) external",
   "function isRegistered(address) view returns (bool)",
   "function userNickname(address) view returns (string)",
-  "function getLeaderboardPage(uint256 offset, uint256 limit) view returns (address[], uint256[], string[], uint8[], uint8[])",
-  "function totalUsers() view returns (uint256)"
+  "function getLeaderboardPage(uint256 offset, uint256 limit) view returns (address[], uint256[], string[], uint8[], uint8[])"
 ];
 
 const SHEVELEV_ABI = [
@@ -99,12 +98,10 @@ export default function App() {
     loadTotalUsers();
   }, []);
 
-  // Анимация счётчика
   useEffect(() => {
     if (totalUsers === 0) return;
     let start = 0;
-    const duration = 2000;
-    const step = totalUsers / (duration / 16);
+    const step = totalUsers / 60;
     const timer = setInterval(() => {
       start += step;
       if (start >= totalUsers) {
@@ -121,8 +118,9 @@ export default function App() {
     try {
       const provider = new ethers.JsonRpcProvider("https://node.decimalchain.com/web3/");
       const rep = new ethers.Contract(REPUTATION_ADDRESS, REPUTATION_ABI, provider);
-      const total = await rep.totalUsers();
-      setTotalUsers(Number(total));
+      const [addrs] = await rep.getLeaderboardPage(0, 1000);
+      const registered = addrs.filter(a => a !== "0x0000000000000000000000000000000000000000");
+      setTotalUsers(registered.length);
     } catch (e) {
       setTotalUsers(0);
     }
@@ -186,13 +184,11 @@ export default function App() {
   }, [page]);
 
   const tierInfo = tier ? TIERS[tier] : null;
-
   function navigate(id) { setPage(id); setMenuOpen(false); }
 
   const styles = {
     page: { minHeight: "100vh", background: "#0f1117", color: "#e2e8f0", fontFamily: "'Rubik', sans-serif", fontWeight: 500, position: "relative", overflow: "hidden" },
     header: { background: "rgba(15,17,23,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 2rem", height: "64px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 },
-    logo: { fontSize: "1.3rem", color: "#fff", cursor: "pointer", letterSpacing: "-0.5px" },
     btn: { background: "linear-gradient(135deg, #00c4a0, #0099cc)", color: "#fff", border: "none", padding: "0.6rem 1.4rem", borderRadius: "8px", cursor: "pointer", fontSize: "0.9rem", fontWeight: 700 },
     card: { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "1.5rem", backdropFilter: "blur(10px)" },
     input: { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#e2e8f0", padding: "0.7rem 1rem", borderRadius: "8px", width: "100%", fontSize: "0.95rem", outline: "none", fontFamily: "'Rubik', sans-serif" },
@@ -202,7 +198,7 @@ export default function App() {
     <div style={styles.page}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; }
         body { background: #0f1117; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #0f1117; }
@@ -211,7 +207,7 @@ export default function App() {
         .card-hover:hover { border-color: rgba(0,196,160,0.3) !important; transform: translateY(-2px); transition: all 0.2s; }
       `}</style>
 
-      {/* МУХОМОРЫ НА ФОНЕ */}
+      {/* МУХОМОРЫ */}
       <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
         {[
           { top: "5%", left: "2%", size: 180, rotate: -15 },
@@ -229,17 +225,19 @@ export default function App() {
 
       {/* HEADER */}
       <div style={styles.header}>
-        <div onClick={() => navigate("home")} style={styles.logo}>🍄 <span style={{ background: "linear-gradient(135deg, #00c4a0, #0099cc)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>AMANITA</span></div>
+        <div onClick={() => navigate("home")} style={{ fontSize: "1.3rem", color: "#fff", cursor: "pointer", letterSpacing: "-0.5px" }}>
+          🍄 <span style={{ background: "linear-gradient(135deg, #00c4a0, #0099cc)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>AMANITA</span>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           {account && <div style={{ fontSize: "0.75rem", color: "#00c4a0", background: "rgba(0,196,160,0.1)", padding: "0.3rem 0.8rem", borderRadius: "20px", border: "1px solid rgba(0,196,160,0.2)" }}>{account.slice(0,6)}...{account.slice(-4)}</div>}
-          {!account && <button onClick={() => modal.open()} style={styles.btn}>Войти</button>}
+          {!account && <button onClick={() => modal.open()} style={styles.btn}>🦊 Войти</button>}
           <div style={{ position: "relative" }}>
             <button onClick={() => setMenuOpen(!menuOpen)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#e2e8f0", width: "40px", height: "40px", borderRadius: "8px", cursor: "pointer", fontSize: "1.1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>☰</button>
             {menuOpen && (
               <div style={{ position: "absolute", right: 0, top: "3rem", background: "#1a1d27", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", minWidth: "220px", zIndex: 200, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
                 {MENU_ITEMS.map(item => (
                   <div key={item.id} className="menu-item" onClick={() => navigate(item.id)} style={{ padding: "0.8rem 1.2rem", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", gap: "0.75rem", color: page === item.id ? "#00c4a0" : "#e2e8f0", fontSize: "0.9rem" }}>
-                    <span style={{ fontSize: "1.1rem" }}>{item.icon}</span><span>{item.label}</span>
+                    <span>{item.icon}</span><span>{item.label}</span>
                   </div>
                 ))}
                 {account && (
@@ -256,10 +254,8 @@ export default function App() {
       {/* CONTENT */}
       <div style={{ maxWidth: "900px", margin: "0 auto", padding: "3rem 1.5rem", position: "relative", zIndex: 1 }}>
 
-        {/* ГЛАВНАЯ */}
         {page === "home" && (
           <div>
-            {/* HERO */}
             <div style={{ textAlign: "center", marginBottom: "3rem" }}>
               <div style={{ fontSize: "4rem", marginBottom: "1rem", filter: "drop-shadow(0 0 30px rgba(0,196,160,0.3))" }}>🍄</div>
               <h1 style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 900, color: "#fff", letterSpacing: "-1px", lineHeight: 1.1, marginBottom: "1rem" }}>
@@ -269,36 +265,27 @@ export default function App() {
               <p style={{ color: "#94a3b8", fontSize: "1.1rem", maxWidth: "400px", margin: "0 auto 2rem" }}>Открытая децентрализованная сеть для обмена опытом</p>
 
               {/* СЧЁТЧИК */}
-              <div style={{ display: "inline-flex", alignItems: "center", gap: "1rem", background: "rgba(0,196,160,0.08)", border: "1px solid rgba(0,196,160,0.2)", borderRadius: "16px", padding: "1.2rem 2rem", marginBottom: "2rem" }}>
-                <div>
-                  <div style={{ fontSize: "2.5rem", fontWeight: 900, color: "#00c4a0", lineHeight: 1 }}>{displayCount}</div>
-                  <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>участников в сети</div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "1.5rem", background: "rgba(0,196,160,0.08)", border: "1px solid rgba(0,196,160,0.2)", borderRadius: "16px", padding: "1.2rem 2.5rem", marginBottom: "2rem" }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "2.8rem", fontWeight: 900, color: "#00c4a0", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{displayCount}</div>
+                  <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "0.3rem" }}>участников в сети</div>
                 </div>
-                <div style={{ width: "1px", height: "40px", background: "rgba(0,196,160,0.2)" }}></div>
-                <div style={{ fontSize: "1.5rem" }}>🌍</div>
               </div>
 
               {!account && (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
                   <button onClick={() => modal.open()} style={{ ...styles.btn, padding: "0.9rem 2.5rem", fontSize: "1rem", borderRadius: "12px", boxShadow: "0 0 30px rgba(0,196,160,0.3)" }}>
-                    Войти в сеть
+                    🦊 Войти через MetaMask
                   </button>
-                  <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem", color: "#64748b" }}>
-                    <span>🦊 MetaMask</span>
-                    <span>·</span>
-                    <span>G Google</span>
-                    <span>·</span>
-                    <span>📧 Email</span>
-                  </div>
+                  <div style={{ fontSize: "0.8rem", color: "#64748b" }}>Расширение для браузера или мобильное приложение</div>
                 </div>
               )}
             </div>
 
-            {/* ПОСЛЕ ВХОДА */}
             {account && (
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 <div style={{ ...styles.card, display: "flex", alignItems: "center", gap: "1.5rem" }} className="card-hover">
-                  <div style={{ fontSize: "3rem", filter: "drop-shadow(0 0 10px rgba(0,196,160,0.3))" }}>{tierInfo?.icon || "🌱"}</div>
+                  <div style={{ fontSize: "3rem" }}>{tierInfo?.icon || "🌱"}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ color: tierInfo?.color || "#9ca3af", fontSize: "1.1rem", fontWeight: 700 }}>{tierInfo?.name || "Зерно"}</div>
                     <div style={{ color: "#64748b", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} токенов SHEVELEV</div>
@@ -308,68 +295,71 @@ export default function App() {
 
                 {!registered && (
                   <div style={styles.card}>
-                    <p style={{ color: "#94a3b8", marginBottom: "0.75rem", fontSize: "0.9rem" }}>Выберите ник для регистрации:</p>
+                    <p style={{ color: "#94a3b8", marginBottom: "0.75rem", fontSize: "0.9rem" }}>Выберите ник:</p>
                     <div style={{ display: "flex", gap: "0.75rem" }}>
                       <input value={inputNick} onChange={e => setInputNick(e.target.value)} placeholder="Ваш ник..." maxLength={32} style={styles.input} />
-                      <button onClick={registerUser} disabled={loading} style={{ ...styles.btn, whiteSpace: "nowrap", borderRadius: "8px" }}>
+                      <button onClick={registerUser} disabled={loading} style={{ ...styles.btn, whiteSpace: "nowrap" }}>
                         {loading ? "..." : "Зарегистрироваться"}
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* УРОВНИ */}
                 <div style={styles.card}>
-                  <h3 style={{ color: "#fff", marginBottom: "1.25rem", fontSize: "1rem", fontWeight: 700 }}>Рейтинг Amanita Network</h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    {Object.entries(TIERS).reverse().map(([t, info]) => (
-                      <div key={t} style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.75rem 1rem", background: "rgba(255,255,255,0.02)", borderRadius: "8px", border: `1px solid ${Number(t) === tier ? info.color + "40" : "transparent"}` }}>
-                        <span style={{ fontSize: "1.3rem" }}>{info.icon}</span>
-                        <span style={{ color: info.color, width: "90px", fontSize: "0.9rem" }}>{info.name}</span>
-                        <span style={{ color: "#64748b", fontSize: "0.85rem" }}>от {info.min} токенов SHEVELEV</span>
-                        {Number(t) === tier && <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: info.color, background: info.color + "20", padding: "0.2rem 0.6rem", borderRadius: "20px" }}>Ваш уровень</span>}
-                      </div>
-                    ))}
-                  </div>
+                  <h3 style={{ color: "#fff", marginBottom: "1rem", fontSize: "1rem" }}>Рейтинг Amanita Network</h3>
+                  {Object.entries(TIERS).reverse().map(([t, info]) => (
+                    <div key={t} style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.75rem 1rem", background: "rgba(255,255,255,0.02)", borderRadius: "8px", marginBottom: "0.4rem", border: `1px solid ${Number(t) === tier ? info.color + "40" : "transparent"}` }}>
+                      <span style={{ fontSize: "1.3rem" }}>{info.icon}</span>
+                      <span style={{ color: info.color, width: "90px", fontSize: "0.9rem" }}>{info.name}</span>
+                      <span style={{ color: "#64748b", fontSize: "0.85rem" }}>от {info.min} токенов SHEVELEV</span>
+                      {Number(t) === tier && <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: info.color, background: info.color + "20", padding: "0.2rem 0.6rem", borderRadius: "20px" }}>Ваш уровень</span>}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* КАК ВОЙТИ — только если не залогинен */}
             {!account && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem", marginTop: "2rem" }}>
-                {[
-                  { icon: "🦊", title: "MetaMask", desc: "Расширение для браузера или мобильное приложение. Полный доступ к токенам SHEVELEV." },
-                  { icon: "G", title: "Google", desc: "Войдите через Google аккаунт. Кошелёк создаётся автоматически.", gradient: true },
-                  { icon: "📧", title: "Email", desc: "Войдите через email. Быстро и без лишних шагов." },
-                ].map((item, i) => (
-                  <div key={i} style={{ ...styles.card, cursor: "pointer" }} className="card-hover" onClick={() => modal.open()}>
-                    <div style={{ fontSize: item.gradient ? "1.3rem" : "1.8rem", fontWeight: item.gradient ? 900 : 400, color: item.gradient ? "#4285f4" : "#fff", marginBottom: "0.75rem", background: item.gradient ? "linear-gradient(135deg, #4285f4, #ea4335)" : "none", WebkitBackgroundClip: item.gradient ? "text" : "none", WebkitTextFillColor: item.gradient ? "transparent" : "inherit" }}>{item.icon}</div>
-                    <div style={{ color: "#fff", fontWeight: 700, marginBottom: "0.4rem" }}>{item.title}</div>
-                    <div style={{ color: "#64748b", fontSize: "0.85rem", lineHeight: 1.5 }}>{item.desc}</div>
+              <div style={{ marginTop: "2rem" }}>
+                <div style={{ ...styles.card }}>
+                  <h3 style={{ color: "#00c4a0", marginBottom: "1rem", fontSize: "0.95rem" }}>Как войти?</h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <div style={{ display: "flex", gap: "1rem" }}>
+                      <span style={{ fontSize: "1.5rem" }}>💻</span>
+                      <div>
+                        <div style={{ color: "#fff", fontSize: "0.9rem" }}>Через браузер</div>
+                        <div style={{ color: "#64748b", fontSize: "0.85rem" }}>Установите расширение MetaMask для Chrome, Edge или Firefox.</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "1rem" }}>
+                      <span style={{ fontSize: "1.5rem" }}>📱</span>
+                      <div>
+                        <div style={{ color: "#fff", fontSize: "0.9rem" }}>Через телефон</div>
+                        <div style={{ color: "#64748b", fontSize: "0.85rem" }}>Установите приложение MetaMask. Откройте сайт через браузер внутри MetaMask.</div>
+                      </div>
+                    </div>
                   </div>
-                ))}
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* МОЯ СТРАНИЦА */}
         {page === "profile" && (
           <div>
             <h2 style={{ color: "#fff", marginBottom: "1.5rem", fontWeight: 900 }}>👤 Моя страница</h2>
             {!account
-              ? <div style={{ ...styles.card, textAlign: "center", color: "#64748b" }}>
+              ? <div style={{ ...styles.card, textAlign: "center", color: "#64748b", padding: "3rem" }}>
                   <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🔒</div>
                   <p>Подключите кошелёк для просмотра профиля</p>
-                  <button onClick={() => modal.open()} style={{ ...styles.btn, marginTop: "1rem" }}>Войти</button>
+                  <button onClick={() => modal.open()} style={{ ...styles.btn, marginTop: "1rem" }}>🦊 Войти</button>
                 </div>
               : <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <div style={{ ...styles.card, display: "flex", alignItems: "center", gap: "1.5rem" }}>
                     <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: `linear-gradient(135deg, ${tierInfo?.color || "#9ca3af"}, #0f1117)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem" }}>{tierInfo?.icon || "🌱"}</div>
                     <div>
                       <div style={{ color: "#fff", fontSize: "1.3rem", fontWeight: 700 }}>{nickname || "Без ника"}</div>
-                      <div style={{ color: tierInfo?.color || "#9ca3af", fontSize: "0.9rem" }}>{tierInfo?.name || "Зерно"}</div>
+                      <div style={{ color: tierInfo?.color || "#9ca3af" }}>{tierInfo?.name || "Зерно"}</div>
                       <div style={{ color: "#64748b", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} токенов SHEVELEV</div>
                     </div>
                   </div>
@@ -461,7 +451,6 @@ export default function App() {
 
       </div>
 
-      {/* FOOTER */}
       <div style={{ textAlign: "center", padding: "1.5rem", color: "#334155", fontSize: "0.75rem", borderTop: "1px solid rgba(255,255,255,0.04)", position: "relative", zIndex: 1 }}>
         ⚠️ Только для легального личного опыта · Не реклама · Не продажа · Консультируйтесь с врачом
       </div>
