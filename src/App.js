@@ -54,7 +54,7 @@ export default function App() {
 
   async function connect() {
     if (!window.ethereum) {
-      alert("MetaMask не установлен! Установите расширение MetaMask в браузере или используйте приложение MetaMask на телефоне.");
+      window.location.href = `https://metamask.app.link/dapp/${window.location.host}`;
       return;
     }
     try {
@@ -149,14 +149,18 @@ export default function App() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#070908", color: "#e8dcc8", fontFamily: "Georgia, serif" }}>
+    <div style={{ minHeight: "100vh", background: "#070908", color: "#e8dcc8", fontFamily: "'Rubik', sans-serif", fontWeight: 700 }}>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@700&display=swap');
+        * { font-family: 'Rubik', sans-serif !important; font-weight: 700 !important; }
+      `}</style>
 
       {/* HEADER */}
       <div style={{ background: "#0c0f0a", borderBottom: "1px solid #181e12", padding: "1rem 1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }}>
-        <div onClick={() => navigate("home")} style={{ fontSize: "1.4rem", fontWeight: "bold", color: "#00c4a0", cursor: "pointer" }}>🍄 AMANITA</div>
+        <div onClick={() => navigate("home")} style={{ fontSize: "1.4rem", color: "#00c4a0", cursor: "pointer" }}>🍄 AMANITA</div>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           {account && <div style={{ fontSize: "0.75rem", color: "#00c4a0" }}>{account.slice(0,6)}...{account.slice(-4)}</div>}
-          {/* БУРГЕР */}
           <div style={{ position: "relative" }}>
             <button onClick={() => setMenuOpen(!menuOpen)} style={{ background: "transparent", border: "1px solid #253018", color: "#e8dcc8", padding: "0.4rem 0.6rem", borderRadius: "4px", cursor: "pointer", fontSize: "1.1rem" }}>☰</button>
             {menuOpen && (
@@ -184,7 +188,6 @@ export default function App() {
       {/* MAIN */}
       <div style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem 1rem" }}>
 
-        {/* ГЛАВНАЯ */}
         {page === "home" && (
           <div>
             <div style={{ textAlign: "center", marginBottom: "2rem" }}>
@@ -194,29 +197,28 @@ export default function App() {
 
             {!account && (
               <div>
-                {/* ИНСТРУКЦИЯ */}
                 <div style={{ background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", padding: "1.5rem", marginBottom: "1.5rem" }}>
                   <h3 style={{ color: "#00c4a0", marginBottom: "1rem" }}>Как войти?</h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                     <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
                       <span style={{ fontSize: "1.5rem" }}>💻</span>
                       <div>
-                        <div style={{ color: "#fff", fontWeight: "bold" }}>Через браузер</div>
-                        <div style={{ color: "#b0a490", fontSize: "0.85rem" }}>Установите расширение MetaMask для Chrome, Edge или Firefox. Нажмите "Подключить MetaMask" ниже.</div>
+                        <div style={{ color: "#fff" }}>Через браузер</div>
+                        <div style={{ color: "#b0a490", fontSize: "0.85rem", fontWeight: 400 }}>Установите расширение MetaMask для Chrome, Edge или Firefox.</div>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
                       <span style={{ fontSize: "1.5rem" }}>📱</span>
                       <div>
-                        <div style={{ color: "#fff", fontWeight: "bold" }}>Через телефон</div>
-                        <div style={{ color: "#b0a490", fontSize: "0.85rem" }}>Установите приложение MetaMask. Откройте этот сайт через встроенный браузер MetaMask и нажмите "Подключить".</div>
+                        <div style={{ color: "#fff" }}>Через телефон</div>
+                        <div style={{ color: "#b0a490", fontSize: "0.85rem", fontWeight: 400 }}>Установите приложение MetaMask. Кнопка ниже откроет его автоматически.</div>
                       </div>
                     </div>
                   </div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <button onClick={connect} style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "1rem 2rem", borderRadius: "4px", cursor: "pointer", fontSize: "1.1rem", fontWeight: "bold" }}>
-                    🦊 Подключить MetaMask
+                  <button onClick={connect} style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "1rem 2rem", borderRadius: "4px", cursor: "pointer", fontSize: "1.1rem" }}>
+                    🦊 Войти
                   </button>
                 </div>
               </div>
@@ -228,12 +230,12 @@ export default function App() {
                   <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
                     <div style={{ fontSize: "2.5rem" }}>{tierInfo?.icon || "🌱"}</div>
                     <div>
-                      <div style={{ color: tierInfo?.color || "#6b7280", fontWeight: "bold", fontSize: "1.1rem" }}>{tierInfo?.name || "Зерно"}</div>
+                      <div style={{ color: tierInfo?.color || "#6b7280", fontSize: "1.1rem" }}>{tierInfo?.name || "Зерно"}</div>
                       <div style={{ color: "#b0a490", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} токенов SHEVELEV</div>
                     </div>
                   </div>
                   {registered
-                    ? <div style={{ color: "#00c4a0" }}>👋 Привет, <strong>{nickname}</strong>!</div>
+                    ? <div style={{ color: "#00c4a0" }}>👋 Привет, {nickname}!</div>
                     : (
                       <div>
                         <p style={{ color: "#b0a490", marginBottom: "0.5rem" }}>Выберите ник:</p>
@@ -241,7 +243,7 @@ export default function App() {
                           <input value={inputNick} onChange={e => setInputNick(e.target.value)} placeholder="Ваш ник..." maxLength={32}
                             style={{ flex: 1, background: "#181e12", border: "1px solid #253018", color: "#e8dcc8", padding: "0.5rem", borderRadius: "4px" }} />
                           <button onClick={registerUser} disabled={loading}
-                            style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "0.5rem 1rem", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
+                            style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "0.5rem 1rem", borderRadius: "4px", cursor: "pointer" }}>
                             {loading ? "..." : "Войти"}
                           </button>
                         </div>
@@ -250,13 +252,12 @@ export default function App() {
                   }
                 </div>
 
-                {/* ТАБЛИЦА УРОВНЕЙ */}
                 <div style={{ background: "#0c0f0a", border: "1px solid #181e12", borderRadius: "4px", padding: "1.5rem" }}>
                   <h3 style={{ color: "#fff", marginBottom: "1rem" }}>Рейтинг Amanita Network</h3>
                   {Object.entries(TIERS).reverse().map(([t, info]) => (
                     <div key={t} style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.6rem 0", borderBottom: "1px solid #181e12" }}>
                       <span style={{ fontSize: "1.3rem" }}>{info.icon}</span>
-                      <span style={{ color: info.color, fontWeight: "bold", width: "90px" }}>{info.name}</span>
+                      <span style={{ color: info.color, width: "90px" }}>{info.name}</span>
                       <span style={{ color: "#b0a490", fontSize: "0.85rem" }}>от {info.min} токенов SHEVELEV</span>
                     </div>
                   ))}
@@ -266,7 +267,6 @@ export default function App() {
           </div>
         )}
 
-        {/* МОЯ СТРАНИЦА */}
         {page === "profile" && (
           <div>
             <h2 style={{ color: "#fff" }}>👤 Моя страница</h2>
@@ -276,7 +276,7 @@ export default function App() {
                   <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
                     <div style={{ fontSize: "3rem" }}>{tierInfo?.icon || "🌱"}</div>
                     <div>
-                      <div style={{ color: "#fff", fontWeight: "bold", fontSize: "1.2rem" }}>{nickname || "Без ника"}</div>
+                      <div style={{ color: "#fff", fontSize: "1.2rem" }}>{nickname || "Без ника"}</div>
                       <div style={{ color: tierInfo?.color || "#6b7280" }}>{tierInfo?.name || "Зерно"}</div>
                       <div style={{ color: "#b0a490", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} токенов SHEVELEV</div>
                     </div>
@@ -287,7 +287,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ЛЕНТА */}
         {page === "feed" && (
           <div>
             <h2 style={{ color: "#fff" }}>📝 Лента</h2>
@@ -297,7 +296,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ЧАТЫ */}
         {page === "chats" && (
           <div>
             <h2 style={{ color: "#fff" }}>💬 Чаты</h2>
@@ -307,7 +305,6 @@ export default function App() {
           </div>
         )}
 
-        {/* СОЗДАТЬ ЧАТ */}
         {page === "create_chat" && (
           <div>
             <h2 style={{ color: "#fff" }}>➕ Создать чат</h2>
@@ -317,35 +314,30 @@ export default function App() {
           </div>
         )}
 
-        {/* ДРУГИЕ */}
         {page === "others" && (
           <div>
             <h2 style={{ color: "#fff", marginBottom: "1rem" }}>👥 Другие участники</h2>
-
-            {/* ИНСТРУКЦИЯ */}
             <div style={{ background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", padding: "1.5rem", marginBottom: "1.5rem" }}>
               <h3 style={{ color: "#00c4a0", marginBottom: "1rem" }}>Как попасть в рейтинг?</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 <div style={{ display: "flex", gap: "0.75rem" }}>
-                  <span style={{ color: "#00c4a0", fontWeight: "bold" }}>1.</span>
-                  <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>Установите <strong style={{ color: "#fff" }}>MetaMask</strong> — расширение для браузера или приложение на телефон</div>
+                  <span style={{ color: "#00c4a0" }}>1.</span>
+                  <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>Установите <span style={{ color: "#fff" }}>MetaMask</span> — расширение для браузера или приложение на телефон</div>
                 </div>
                 <div style={{ display: "flex", gap: "0.75rem" }}>
-                  <span style={{ color: "#00c4a0", fontWeight: "bold" }}>2.</span>
-                  <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>Добавьте сеть <strong style={{ color: "#fff" }}>Decimal Smart Chain</strong> — при входе на сайт это произойдёт автоматически</div>
+                  <span style={{ color: "#00c4a0" }}>2.</span>
+                  <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>Добавьте сеть <span style={{ color: "#fff" }}>Decimal Smart Chain</span> — при входе на сайт это произойдёт автоматически</div>
                 </div>
                 <div style={{ display: "flex", gap: "0.75rem" }}>
-                  <span style={{ color: "#00c4a0", fontWeight: "bold" }}>3.</span>
-                  <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>Получите токены <strong style={{ color: "#fff" }}>SHEVELEV</strong> — чем больше токенов SHEVELEV на вашем кошельке, тем выше уровень</div>
+                  <span style={{ color: "#00c4a0" }}>3.</span>
+                  <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>Получите токены <span style={{ color: "#fff" }}>SHEVELEV</span> — чем больше токенов SHEVELEV на кошельке, тем выше уровень</div>
                 </div>
                 <div style={{ display: "flex", gap: "0.75rem" }}>
-                  <span style={{ color: "#00c4a0", fontWeight: "bold" }}>4.</span>
+                  <span style={{ color: "#00c4a0" }}>4.</span>
                   <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>Чтобы увидеть токены SHEVELEV в MetaMask — импортируйте токен по адресу: <span style={{ color: "#00c4a0", fontSize: "0.75rem", wordBreak: "break-all" }}>0xb5c1933b1fa015818ac2c53812f67611c48e6b56</span></div>
                 </div>
               </div>
             </div>
-
-            {/* ЛИДЕРБОРД */}
             {leaderboard.length === 0
               ? <div style={{ textAlign: "center", color: "#b0a490" }}>Загрузка...</div>
               : leaderboard.map((u, i) => (
@@ -353,7 +345,7 @@ export default function App() {
                   <div style={{ color: "#b0a490", width: "30px", textAlign: "center" }}>#{i+1}</div>
                   <div style={{ fontSize: "1.5rem" }}>{TIERS[u.tier]?.icon || "🌱"}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ color: TIERS[u.tier]?.color || "#6b7280", fontWeight: "bold" }}>{u.nickname || u.address.slice(0,8)+"..."}</div>
+                    <div style={{ color: TIERS[u.tier]?.color || "#6b7280" }}>{u.nickname || u.address.slice(0,8)+"..."}</div>
                     <div style={{ color: "#b0a490", fontSize: "0.8rem" }}>{parseFloat(u.balance).toLocaleString()} токенов SHEVELEV</div>
                   </div>
                 </div>
@@ -362,14 +354,13 @@ export default function App() {
           </div>
         )}
 
-        {/* ДИСКЛЕЙМЕР */}
         {page === "disclaimer" && (
           <div>
             <h2 style={{ color: "#fff", marginBottom: "1rem" }}>⚠️ Дисклеймер</h2>
             <div style={{ background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", padding: "1.5rem", color: "#b0a490", lineHeight: "1.8" }}>
-              <p>Amanita Network — это открытая децентрализованная платформа для обмена личным опытом с Amanita muscaria исключительно в странах где это законно.</p>
-              <p>Платформа не занимается продажей, рекламой или пропагандой каких-либо веществ. Весь контент публикуется пользователями и отражает только их личный опыт.</p>
-              <p>Перед любым использованием проконсультируйтесь с врачом. Платформа не несёт ответственности за действия пользователей.</p>
+              <p>Amanita Network — открытая децентрализованная платформа для обмена личным опытом с Amanita muscaria исключительно в странах где это законно.</p>
+              <p>Платформа не занимается продажей, рекламой или пропагандой каких-либо веществ.</p>
+              <p>Перед любым использованием проконсультируйтесь с врачом.</p>
               <p style={{ color: "#ef4444" }}>⛔ Запрещено для лиц до 18 лет.</p>
             </div>
           </div>
@@ -377,7 +368,6 @@ export default function App() {
 
       </div>
 
-      {/* FOOTER */}
       <div style={{ textAlign: "center", padding: "1rem", color: "#253018", fontSize: "0.7rem", borderTop: "1px solid #181e12", marginTop: "2rem" }}>
         ⚠️ Только для легального личного опыта · Не реклама · Не продажа · Консультируйтесь с врачом
       </div>
