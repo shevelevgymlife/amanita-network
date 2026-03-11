@@ -251,11 +251,21 @@ function SendTokensModal({ toAddress, toNickname, account, onClose }) {
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
 
-  async function sendTokens() {
+    async function sendTokens() {
     if (!amount || parseFloat(amount) <= 0) return;
     setSending(true);
     try {
       const walletProvider = modal.getWalletProvider();
+      // Переключаем на Decimal Chain
+      await walletProvider.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: "0x4B" }]
+      }).catch(async () => {
+        await walletProvider.request({
+          method: "wallet_addEthereumChain",
+          params: [{ chainId: "0x4B", chainName: "Decimal Smart Chain", nativeCurrency: { name: "DEL", symbol: "DEL", decimals: 18 }, rpcUrls: ["https://node.decimalchain.com/web3/"] }]
+        });
+      });
       const provider = new ethers.BrowserProvider(walletProvider);
       const signer = await provider.getSigner();
       const shev = new ethers.Contract(SHEVELEV_ADDRESS, SHEVELEV_ABI, signer);
@@ -263,10 +273,12 @@ function SendTokensModal({ toAddress, toNickname, account, onClose }) {
       await tx.wait();
       setDone(true);
     } catch (e) {
+      if (e.message.includes("rejected")) return;
       alert("Ошибка: " + e.message);
     }
     setSending(false);
   }
+
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
