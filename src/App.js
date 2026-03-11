@@ -1,5 +1,30 @@
 import { useState, useEffect } from "react";
+import { createAppKit } from "@reown/appkit";
+import { EthersAdapter } from "@reown/appkit-adapter-ethers";
 import { ethers } from "ethers";
+
+const projectId = process.env.REACT_APP_WC_PROJECT_ID;
+
+const decimalChain = {
+  id: 75,
+  name: "Decimal Smart Chain",
+  network: "decimal",
+  nativeCurrency: { name: "DEL", symbol: "DEL", decimals: 18 },
+  rpcUrls: { default: { http: ["https://node.decimalchain.com/web3/"] } },
+};
+
+const modal = createAppKit({
+  adapters: [new EthersAdapter()],
+  projectId,
+  networks: [decimalChain],
+  defaultNetwork: decimalChain,
+  metadata: {
+    name: "Amanita Network",
+    description: "Лес знает. Делись безопасно.",
+    url: "https://amanita-network.onrender.com",
+    icons: ["https://amanita-network.onrender.com/favicon.ico"]
+  }
+});
 
 const REPUTATION_ADDRESS = "0xdb62AD6F2f4bb1c5D230aCeaCb937530746C5e13";
 const SHEVELEV_ADDRESS = "0xb5c1933b1fa015818ac2c53812f67611c48e6b56";
@@ -15,13 +40,6 @@ const REPUTATION_ABI = [
 const SHEVELEV_ABI = [
   "function balanceOf(address) view returns (uint256)"
 ];
-
-const DECIMAL_CHAIN = {
-  chainId: "0x4b",
-  chainName: "Decimal Smart Chain",
-  rpcUrls: ["https://node.decimalchain.com/web3/"],
-  nativeCurrency: { name: "DEL", symbol: "DEL", decimals: 18 }
-};
 
 const TIERS = {
   1: { name: "Зерно", icon: "🌱", color: "#6b7280" },
@@ -42,41 +60,44 @@ export default function App() {
   const [page, setPage] = useState("home");
   const [loading, setLoading] = useState(false);
 
-  async function connect() {
-    if (!window.ethereum) return alert("Установите MetaMask!");
+  useEffect(() => {
+    modal.subscribeAccount(async (acc) => {
+      if (acc.address) {
+        setAccount(acc.address);
+        await loadUser(acc.address);
+      } else {
+        setAccount(null);
+        setTier(null);
+        setBalance(null);
+      }
+    });
+  }, []);
+
+  async function loadUser(addr) {
     try {
-      await window.ethereum.request({
-        method: "wallet_addEthereumChain",
-        params: [DECIMAL_CHAIN]
-      });
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-      setAccount(accounts[0]);
-      await loadUser(accounts[0]);
+      const provider = new ethers.JsonRpcProvider("https://node.decimalchain.com/web3/");
+      const rep = new ethers.Contract(REPUTATION_ADDRESS, REPUTATION_ABI, provider);
+      const shev = new ethers.Contract(SHEVELEV_ADDRESS, SHEVELEV_ABI, provider);
+      const [t, bal, isReg] = await Promise.all([
+        rep.getTier(addr),
+        shev.balanceOf(addr),
+        rep.isRegistered(addr)
+      ]);
+      setTier(Number(t));
+      setBalance(ethers.formatEther(bal));
+      setRegistered(isReg);
+      if (isReg) setNickname(await rep.userNickname(addr));
     } catch (e) {
       console.error(e);
     }
-  }
-
-  async function loadUser(addr) {
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const rep = new ethers.Contract(REPUTATION_ADDRESS, REPUTATION_ABI, provider);
-    const shev = new ethers.Contract(SHEVELEV_ADDRESS, SHEVELEV_ABI, provider);
-    const [t, bal, isReg] = await Promise.all([
-      rep.getTier(addr),
-      shev.balanceOf(addr),
-      rep.isRegistered(addr)
-    ]);
-    setTier(Number(t));
-    setBalance(ethers.formatEther(bal));
-    setRegistered(isReg);
-    if (isReg) setNickname(await rep.userNickname(addr));
   }
 
   async function registerUser() {
     if (!inputNick) return;
     setLoading(true);
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      const walletProvider = modal.getWalletProvider();
+      const provider = new ethers.BrowserProvider(walletProvider);
       const signer = await provider.getSigner();
       const rep = new ethers.Contract(REPUTATION_ADDRESS, REPUTATION_ABI, signer);
       const tx = await rep.register(inputNick, 0);
@@ -90,17 +111,21 @@ export default function App() {
   }
 
   async function loadLeaderboard() {
-    const provider = new ethers.JsonRpcProvider("https://node.decimalchain.com/web3/");
-    const rep = new ethers.Contract(REPUTATION_ADDRESS, REPUTATION_ABI, provider);
-    const [addrs, bals, nicks, , tiers] = await rep.getLeaderboardPage(0, 50);
-    const data = addrs.map((a, i) => ({
-      address: a,
-      balance: ethers.formatEther(bals[i]),
-      nickname: nicks[i],
-      tier: Number(tiers[i])
-    }));
-    data.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
-    setLeaderboard(data);
+    try {
+      const provider = new ethers.JsonRpcProvider("https://node.decimalchain.com/web3/");
+      const rep = new ethers.Contract(REPUTATION_ADDRESS, REPUTATION_ABI, provider);
+      const [addrs, bals, nicks, , tiers] = await rep.getLeaderboardPage(0, 50);
+      const data = addrs.map((a, i) => ({
+        address: a,
+        balance: ethers.formatEther(bals[i]),
+        nickname: nicks[i],
+        tier: Number(tiers[i])
+      }));
+      data.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
+      setLeaderboard(data);
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   useEffect(() => {
@@ -112,15 +137,15 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", background: "#070908", color: "#e8dcc8", fontFamily: "Georgia, serif" }}>
       {/* HEADER */}
-      <div style={{ background: "#0c0f0a", borderBottom: "1px solid #181e12", padding: "1rem 1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ background: "#0c0f0a", borderBottom: "1px solid #181e12", padding: "1rem 1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
         <div style={{ fontSize: "1.4rem", fontWeight: "bold", color: "#00c4a0" }}>🍄 AMANITA</div>
-        <div style={{ display: "flex", gap: "1rem" }}>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
           <button onClick={() => setPage("home")} style={navBtn(page === "home")}>Главная</button>
           <button onClick={() => setPage("leaderboard")} style={navBtn(page === "leaderboard")}>Рейтинг</button>
         </div>
         {account
           ? <div style={{ fontSize: "0.75rem", color: "#00c4a0" }}>{account.slice(0,6)}...{account.slice(-4)}</div>
-          : <button onClick={connect} style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "0.5rem 1rem", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>Подключить</button>
+          : <button onClick={() => modal.open()} style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "0.5rem 1rem", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>Подключить</button>
         }
       </div>
 
@@ -137,15 +162,15 @@ export default function App() {
 
             {!account && (
               <div style={{ textAlign: "center" }}>
-                <button onClick={connect} style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "1rem 2rem", borderRadius: "4px", cursor: "pointer", fontSize: "1.1rem", fontWeight: "bold" }}>
-                  Войти через MetaMask
+                <button onClick={() => modal.open()} style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "1rem 2rem", borderRadius: "4px", cursor: "pointer", fontSize: "1.1rem", fontWeight: "bold" }}>
+                  Войти через кошелёк
                 </button>
+                <p style={{ color: "#b0a490", fontSize: "0.85rem", marginTop: "1rem" }}>MetaMask, WalletConnect и другие кошельки</p>
               </div>
             )}
 
             {account && (
               <div>
-                {/* ПРОФИЛЬ */}
                 <div style={{ background: "#0c0f0a", border: "1px solid #181e12", borderRadius: "4px", padding: "1.5rem", marginBottom: "1rem" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
                     <div style={{ fontSize: "2.5rem" }}>{tierInfo?.icon || "🌱"}</div>
@@ -159,7 +184,7 @@ export default function App() {
                     ? <div style={{ color: "#00c4a0" }}>👋 Привет, <strong>{nickname}</strong>!</div>
                     : (
                       <div>
-                        <p style={{ color: "#b0a490", marginBottom: "0.5rem" }}>Выберите ник для регистрации:</p>
+                        <p style={{ color: "#b0a490", marginBottom: "0.5rem" }}>Выберите ник:</p>
                         <div style={{ display: "flex", gap: "0.5rem" }}>
                           <input
                             value={inputNick}
@@ -177,7 +202,6 @@ export default function App() {
                   }
                 </div>
 
-                {/* УРОВНИ */}
                 <div style={{ background: "#0c0f0a", border: "1px solid #181e12", borderRadius: "4px", padding: "1.5rem" }}>
                   <h3 style={{ color: "#fff", marginBottom: "1rem" }}>Уровни SHEVELEV</h3>
                   {Object.entries(TIERS).reverse().map(([t, info]) => (
@@ -213,10 +237,8 @@ export default function App() {
             }
           </div>
         )}
-
       </div>
 
-      {/* DISCLAIMER */}
       <div style={{ textAlign: "center", padding: "1rem", color: "#1c2614", fontSize: "0.7rem", borderTop: "1px solid #181e12" }}>
         ⚠️ Только для легального личного опыта · Не реклама · Не продажа · Консультируйтесь с врачом
       </div>
