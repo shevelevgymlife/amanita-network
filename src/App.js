@@ -214,7 +214,8 @@ export default function App() {
   async function loadComments(postId) {
     try {
       const r = await fetch(`${API}/api/comments/${postId}`);
-      setComments(prev => ({ ...prev, [postId]: await r.json() }));
+      const data = await r.json();
+setComments(prev => ({ ...prev, [postId]: data }));
     } catch (e) { console.error(e); }
   }
 
