@@ -24,7 +24,7 @@ const modal = createAppKit({
     url: "https://amanita-network.onrender.com",
     icons: ["https://amanita-network.onrender.com/favicon.ico"]
   },
-  features: { email: false, socials: false }
+  features: { email: true, socials: ["google"] }
 });
 
 const REPUTATION_ADDRESS = "0xdb62AD6F2f4bb1c5D230aCeaCb937530746C5e13";
@@ -35,7 +35,8 @@ const REPUTATION_ABI = [
   "function register(string nickname, uint8 avatarIndex) external",
   "function isRegistered(address) view returns (bool)",
   "function userNickname(address) view returns (string)",
-  "function getLeaderboardPage(uint256 offset, uint256 limit) view returns (address[], uint256[], string[], uint8[], uint8[])"
+  "function getLeaderboardPage(uint256 offset, uint256 limit) view returns (address[], uint256[], string[], uint8[], uint8[])",
+  "function totalUsers() view returns (uint256)"
 ];
 
 const SHEVELEV_ABI = [
@@ -43,11 +44,11 @@ const SHEVELEV_ABI = [
 ];
 
 const TIERS = {
-  1: { name: "Зерно", icon: "🌱", color: "#6b7280", min: "0" },
-  2: { name: "Участник", icon: "🍄", color: "#22c55e", min: "100" },
+  1: { name: "Зерно", icon: "🌱", color: "#9ca3af", min: "0" },
+  2: { name: "Участник", icon: "🍄", color: "#4ade80", min: "100" },
   3: { name: "Адепт", icon: "🌿", color: "#00c4a0", min: "1,000" },
-  4: { name: "Мастер", icon: "🔮", color: "#e879f9", min: "10,000" },
-  5: { name: "Легенда", icon: "⚜️", color: "#ffd700", min: "50,000" }
+  4: { name: "Мастер", icon: "🔮", color: "#c084fc", min: "10,000" },
+  5: { name: "Легенда", icon: "⚜️", color: "#fbbf24", min: "50,000" }
 };
 
 const MENU_ITEMS = [
@@ -58,6 +59,15 @@ const MENU_ITEMS = [
   { id: "others", icon: "👥", label: "Другие" },
   { id: "disclaimer", icon: "⚠️", label: "Дисклеймер" },
 ];
+
+const MUSHROOM_SVG = `<svg viewBox="0 0 100 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="50" cy="55" rx="45" ry="30" fill="white" opacity="0.03"/>
+  <ellipse cx="50" cy="52" rx="42" ry="28" fill="white" opacity="0.03"/>
+  <rect x="38" y="55" width="24" height="40" rx="6" fill="white" opacity="0.03"/>
+  <ellipse cx="35" cy="62" rx="6" ry="4" fill="white" opacity="0.04"/>
+  <ellipse cx="65" cy="58" rx="5" ry="3" fill="white" opacity="0.04"/>
+  <ellipse cx="50" cy="60" rx="4" ry="3" fill="white" opacity="0.04"/>
+</svg>`;
 
 export default function App() {
   const [account, setAccount] = useState(null);
@@ -70,6 +80,8 @@ export default function App() {
   const [page, setPage] = useState("home");
   const [loading, setLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [displayCount, setDisplayCount] = useState(0);
 
   useEffect(() => {
     modal.subscribeAccount(async (acc) => {
@@ -84,7 +96,37 @@ export default function App() {
         setRegistered(false);
       }
     });
+    loadTotalUsers();
   }, []);
+
+  // Анимация счётчика
+  useEffect(() => {
+    if (totalUsers === 0) return;
+    let start = 0;
+    const duration = 2000;
+    const step = totalUsers / (duration / 16);
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= totalUsers) {
+        setDisplayCount(totalUsers);
+        clearInterval(timer);
+      } else {
+        setDisplayCount(Math.floor(start));
+      }
+    }, 16);
+    return () => clearInterval(timer);
+  }, [totalUsers]);
+
+  async function loadTotalUsers() {
+    try {
+      const provider = new ethers.JsonRpcProvider("https://node.decimalchain.com/web3/");
+      const rep = new ethers.Contract(REPUTATION_ADDRESS, REPUTATION_ABI, provider);
+      const total = await rep.totalUsers();
+      setTotalUsers(Number(total));
+    } catch (e) {
+      setTotalUsers(0);
+    }
+  }
 
   async function loadUser(addr) {
     try {
@@ -117,6 +159,7 @@ export default function App() {
       await tx.wait();
       setRegistered(true);
       setNickname(inputNick);
+      setTotalUsers(prev => prev + 1);
     } catch (e) {
       alert("Ошибка: " + e.message);
     }
@@ -131,18 +174,11 @@ export default function App() {
       const [addrs, , nicks, , tiers] = await rep.getLeaderboardPage(0, 50);
       const data = await Promise.all(addrs.map(async (a, i) => {
         const bal = await shev.balanceOf(a);
-        return {
-          address: a,
-          balance: ethers.formatEther(bal),
-          nickname: nicks[i],
-          tier: Number(tiers[i])
-        };
+        return { address: a, balance: ethers.formatEther(bal), nickname: nicks[i], tier: Number(tiers[i]) };
       }));
       data.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
       setLeaderboard(data);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   }
 
   useEffect(() => {
@@ -151,35 +187,63 @@ export default function App() {
 
   const tierInfo = tier ? TIERS[tier] : null;
 
-  function navigate(id) {
-    setPage(id);
-    setMenuOpen(false);
-  }
+  function navigate(id) { setPage(id); setMenuOpen(false); }
+
+  const styles = {
+    page: { minHeight: "100vh", background: "#0f1117", color: "#e2e8f0", fontFamily: "'Rubik', sans-serif", fontWeight: 500, position: "relative", overflow: "hidden" },
+    header: { background: "rgba(15,17,23,0.95)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "0 2rem", height: "64px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 },
+    logo: { fontSize: "1.3rem", color: "#fff", cursor: "pointer", letterSpacing: "-0.5px" },
+    btn: { background: "linear-gradient(135deg, #00c4a0, #0099cc)", color: "#fff", border: "none", padding: "0.6rem 1.4rem", borderRadius: "8px", cursor: "pointer", fontSize: "0.9rem", fontWeight: 700 },
+    card: { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "1.5rem", backdropFilter: "blur(10px)" },
+    input: { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#e2e8f0", padding: "0.7rem 1rem", borderRadius: "8px", width: "100%", fontSize: "0.95rem", outline: "none", fontFamily: "'Rubik', sans-serif" },
+  };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#070908", color: "#e8dcc8", fontFamily: "'Rubik', sans-serif", fontWeight: 700 }}>
+    <div style={styles.page}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0f1117; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0f1117; }
+        ::-webkit-scrollbar-thumb { background: #00c4a0; border-radius: 2px; }
+        .menu-item:hover { background: rgba(255,255,255,0.06) !important; }
+        .card-hover:hover { border-color: rgba(0,196,160,0.3) !important; transform: translateY(-2px); transition: all 0.2s; }
+      `}</style>
 
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@700&display=swap'); * { font-family: 'Rubik', sans-serif !important; font-weight: 700 !important; }`}</style>
+      {/* МУХОМОРЫ НА ФОНЕ */}
+      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
+        {[
+          { top: "5%", left: "2%", size: 180, rotate: -15 },
+          { top: "20%", right: "3%", size: 140, rotate: 10 },
+          { top: "50%", left: "1%", size: 120, rotate: -5 },
+          { top: "70%", right: "5%", size: 160, rotate: 20 },
+          { top: "85%", left: "8%", size: 100, rotate: -10 },
+          { top: "10%", left: "45%", size: 90, rotate: 5 },
+          { top: "60%", left: "50%", size: 130, rotate: -20 },
+        ].map((m, i) => (
+          <div key={i} style={{ position: "absolute", top: m.top, left: m.left, right: m.right, width: m.size, height: m.size, transform: `rotate(${m.rotate}deg)`, opacity: 0.4 }}
+            dangerouslySetInnerHTML={{ __html: MUSHROOM_SVG }} />
+        ))}
+      </div>
 
-      <div style={{ background: "#0c0f0a", borderBottom: "1px solid #181e12", padding: "1rem 1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }}>
-        <div onClick={() => navigate("home")} style={{ fontSize: "1.4rem", color: "#00c4a0", cursor: "pointer" }}>🍄 AMANITA</div>
+      {/* HEADER */}
+      <div style={styles.header}>
+        <div onClick={() => navigate("home")} style={styles.logo}>🍄 <span style={{ background: "linear-gradient(135deg, #00c4a0, #0099cc)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>AMANITA</span></div>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          {account && <div style={{ fontSize: "0.75rem", color: "#00c4a0" }}>{account.slice(0,6)}...{account.slice(-4)}</div>}
+          {account && <div style={{ fontSize: "0.75rem", color: "#00c4a0", background: "rgba(0,196,160,0.1)", padding: "0.3rem 0.8rem", borderRadius: "20px", border: "1px solid rgba(0,196,160,0.2)" }}>{account.slice(0,6)}...{account.slice(-4)}</div>}
+          {!account && <button onClick={() => modal.open()} style={styles.btn}>Войти</button>}
           <div style={{ position: "relative" }}>
-            <button onClick={() => setMenuOpen(!menuOpen)} style={{ background: "transparent", border: "1px solid #253018", color: "#e8dcc8", padding: "0.4rem 0.6rem", borderRadius: "4px", cursor: "pointer", fontSize: "1.1rem" }}>☰</button>
+            <button onClick={() => setMenuOpen(!menuOpen)} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#e2e8f0", width: "40px", height: "40px", borderRadius: "8px", cursor: "pointer", fontSize: "1.1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>☰</button>
             {menuOpen && (
-              <div style={{ position: "absolute", right: 0, top: "2.5rem", background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", minWidth: "200px", zIndex: 200 }}>
+              <div style={{ position: "absolute", right: 0, top: "3rem", background: "#1a1d27", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", minWidth: "220px", zIndex: 200, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
                 {MENU_ITEMS.map(item => (
-                  <div key={item.id} onClick={() => navigate(item.id)} style={{ padding: "0.75rem 1rem", cursor: "pointer", borderBottom: "1px solid #181e12", display: "flex", alignItems: "center", gap: "0.5rem", color: page === item.id ? "#00c4a0" : "#e8dcc8" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#181e12"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    <span>{item.icon}</span><span>{item.label}</span>
+                  <div key={item.id} className="menu-item" onClick={() => navigate(item.id)} style={{ padding: "0.8rem 1.2rem", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", gap: "0.75rem", color: page === item.id ? "#00c4a0" : "#e2e8f0", fontSize: "0.9rem" }}>
+                    <span style={{ fontSize: "1.1rem" }}>{item.icon}</span><span>{item.label}</span>
                   </div>
                 ))}
                 {account && (
-                  <div onClick={() => { modal.disconnect(); setMenuOpen(false); setPage("home"); }} style={{ padding: "0.75rem 1rem", cursor: "pointer", color: "#ef4444", display: "flex", alignItems: "center", gap: "0.5rem" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#181e12"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <div className="menu-item" onClick={() => { modal.disconnect(); setMenuOpen(false); setPage("home"); }} style={{ padding: "0.8rem 1.2rem", cursor: "pointer", color: "#f87171", display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.9rem" }}>
                     <span>🚪</span><span>Выйти</span>
                   </div>
                 )}
@@ -189,102 +253,130 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem 1rem" }}>
+      {/* CONTENT */}
+      <div style={{ maxWidth: "900px", margin: "0 auto", padding: "3rem 1.5rem", position: "relative", zIndex: 1 }}>
 
+        {/* ГЛАВНАЯ */}
         {page === "home" && (
           <div>
-            <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-              <div style={{ fontSize: "3rem" }}>🍄</div>
-              <h1 style={{ fontSize: "2rem", color: "#fff", margin: "0.5rem 0 1rem" }}>Amanita Network</h1>
-            </div>
+            {/* HERO */}
+            <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+              <div style={{ fontSize: "4rem", marginBottom: "1rem", filter: "drop-shadow(0 0 30px rgba(0,196,160,0.3))" }}>🍄</div>
+              <h1 style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 900, color: "#fff", letterSpacing: "-1px", lineHeight: 1.1, marginBottom: "1rem" }}>
+                Amanita<br/>
+                <span style={{ background: "linear-gradient(135deg, #00c4a0, #0099cc)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Network</span>
+              </h1>
+              <p style={{ color: "#94a3b8", fontSize: "1.1rem", maxWidth: "400px", margin: "0 auto 2rem" }}>Открытая децентрализованная сеть для обмена опытом</p>
 
-            {!account && (
-              <div>
-                <div style={{ background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", padding: "1.5rem", marginBottom: "1.5rem" }}>
-                  <h3 style={{ color: "#00c4a0", marginBottom: "1rem" }}>Как войти?</h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                    <div style={{ display: "flex", gap: "1rem" }}>
-                      <span style={{ fontSize: "1.5rem" }}>💻</span>
-                      <div>
-                        <div style={{ color: "#fff" }}>Через браузер</div>
-                        <div style={{ color: "#b0a490", fontSize: "0.85rem" }}>Установите расширение MetaMask для Chrome, Edge или Firefox.</div>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "1rem" }}>
-                      <span style={{ fontSize: "1.5rem" }}>📱</span>
-                      <div>
-                        <div style={{ color: "#fff" }}>Через телефон</div>
-                        <div style={{ color: "#b0a490", fontSize: "0.85rem" }}>Установите MetaMask на телефон. Нажмите "Войти" — появится QR код для сканирования.</div>
-                      </div>
-                    </div>
+              {/* СЧЁТЧИК */}
+              <div style={{ display: "inline-flex", alignItems: "center", gap: "1rem", background: "rgba(0,196,160,0.08)", border: "1px solid rgba(0,196,160,0.2)", borderRadius: "16px", padding: "1.2rem 2rem", marginBottom: "2rem" }}>
+                <div>
+                  <div style={{ fontSize: "2.5rem", fontWeight: 900, color: "#00c4a0", lineHeight: 1 }}>{displayCount}</div>
+                  <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>участников в сети</div>
+                </div>
+                <div style={{ width: "1px", height: "40px", background: "rgba(0,196,160,0.2)" }}></div>
+                <div style={{ fontSize: "1.5rem" }}>🌍</div>
+              </div>
+
+              {!account && (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                  <button onClick={() => modal.open()} style={{ ...styles.btn, padding: "0.9rem 2.5rem", fontSize: "1rem", borderRadius: "12px", boxShadow: "0 0 30px rgba(0,196,160,0.3)" }}>
+                    Войти в сеть
+                  </button>
+                  <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem", color: "#64748b" }}>
+                    <span>🦊 MetaMask</span>
+                    <span>·</span>
+                    <span>G Google</span>
+                    <span>·</span>
+                    <span>📧 Email</span>
                   </div>
                 </div>
-                <div style={{ textAlign: "center" }}>
-                  <button onClick={() => modal.open()} style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "1rem 2rem", borderRadius: "4px", cursor: "pointer", fontSize: "1.1rem" }}>
-                    🦊 Войти
-                  </button>
+              )}
+            </div>
+
+            {/* ПОСЛЕ ВХОДА */}
+            {account && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div style={{ ...styles.card, display: "flex", alignItems: "center", gap: "1.5rem" }} className="card-hover">
+                  <div style={{ fontSize: "3rem", filter: "drop-shadow(0 0 10px rgba(0,196,160,0.3))" }}>{tierInfo?.icon || "🌱"}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: tierInfo?.color || "#9ca3af", fontSize: "1.1rem", fontWeight: 700 }}>{tierInfo?.name || "Зерно"}</div>
+                    <div style={{ color: "#64748b", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} токенов SHEVELEV</div>
+                  </div>
+                  {registered && <div style={{ color: "#00c4a0", fontSize: "0.9rem" }}>👋 {nickname}</div>}
+                </div>
+
+                {!registered && (
+                  <div style={styles.card}>
+                    <p style={{ color: "#94a3b8", marginBottom: "0.75rem", fontSize: "0.9rem" }}>Выберите ник для регистрации:</p>
+                    <div style={{ display: "flex", gap: "0.75rem" }}>
+                      <input value={inputNick} onChange={e => setInputNick(e.target.value)} placeholder="Ваш ник..." maxLength={32} style={styles.input} />
+                      <button onClick={registerUser} disabled={loading} style={{ ...styles.btn, whiteSpace: "nowrap", borderRadius: "8px" }}>
+                        {loading ? "..." : "Зарегистрироваться"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* УРОВНИ */}
+                <div style={styles.card}>
+                  <h3 style={{ color: "#fff", marginBottom: "1.25rem", fontSize: "1rem", fontWeight: 700 }}>Рейтинг Amanita Network</h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    {Object.entries(TIERS).reverse().map(([t, info]) => (
+                      <div key={t} style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.75rem 1rem", background: "rgba(255,255,255,0.02)", borderRadius: "8px", border: `1px solid ${Number(t) === tier ? info.color + "40" : "transparent"}` }}>
+                        <span style={{ fontSize: "1.3rem" }}>{info.icon}</span>
+                        <span style={{ color: info.color, width: "90px", fontSize: "0.9rem" }}>{info.name}</span>
+                        <span style={{ color: "#64748b", fontSize: "0.85rem" }}>от {info.min} токенов SHEVELEV</span>
+                        {Number(t) === tier && <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: info.color, background: info.color + "20", padding: "0.2rem 0.6rem", borderRadius: "20px" }}>Ваш уровень</span>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
-            {account && (
-              <div>
-                <div style={{ background: "#0c0f0a", border: "1px solid #181e12", borderRadius: "4px", padding: "1.5rem", marginBottom: "1rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
-                    <div style={{ fontSize: "2.5rem" }}>{tierInfo?.icon || "🌱"}</div>
-                    <div>
-                      <div style={{ color: tierInfo?.color || "#6b7280", fontSize: "1.1rem" }}>{tierInfo?.name || "Зерно"}</div>
-                      <div style={{ color: "#b0a490", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} токенов SHEVELEV</div>
-                    </div>
+            {/* КАК ВОЙТИ — только если не залогинен */}
+            {!account && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem", marginTop: "2rem" }}>
+                {[
+                  { icon: "🦊", title: "MetaMask", desc: "Расширение для браузера или мобильное приложение. Полный доступ к токенам SHEVELEV." },
+                  { icon: "G", title: "Google", desc: "Войдите через Google аккаунт. Кошелёк создаётся автоматически.", gradient: true },
+                  { icon: "📧", title: "Email", desc: "Войдите через email. Быстро и без лишних шагов." },
+                ].map((item, i) => (
+                  <div key={i} style={{ ...styles.card, cursor: "pointer" }} className="card-hover" onClick={() => modal.open()}>
+                    <div style={{ fontSize: item.gradient ? "1.3rem" : "1.8rem", fontWeight: item.gradient ? 900 : 400, color: item.gradient ? "#4285f4" : "#fff", marginBottom: "0.75rem", background: item.gradient ? "linear-gradient(135deg, #4285f4, #ea4335)" : "none", WebkitBackgroundClip: item.gradient ? "text" : "none", WebkitTextFillColor: item.gradient ? "transparent" : "inherit" }}>{item.icon}</div>
+                    <div style={{ color: "#fff", fontWeight: 700, marginBottom: "0.4rem" }}>{item.title}</div>
+                    <div style={{ color: "#64748b", fontSize: "0.85rem", lineHeight: 1.5 }}>{item.desc}</div>
                   </div>
-                  {registered
-                    ? <div style={{ color: "#00c4a0" }}>👋 Привет, {nickname}!</div>
-                    : (
-                      <div>
-                        <p style={{ color: "#b0a490", marginBottom: "0.5rem" }}>Выберите ник:</p>
-                        <div style={{ display: "flex", gap: "0.5rem" }}>
-                          <input value={inputNick} onChange={e => setInputNick(e.target.value)} placeholder="Ваш ник..." maxLength={32}
-                            style={{ flex: 1, background: "#181e12", border: "1px solid #253018", color: "#e8dcc8", padding: "0.5rem", borderRadius: "4px" }} />
-                          <button onClick={registerUser} disabled={loading}
-                            style={{ background: "#00c4a0", color: "#070908", border: "none", padding: "0.5rem 1rem", borderRadius: "4px", cursor: "pointer" }}>
-                            {loading ? "..." : "Войти"}
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  }
-                </div>
-
-                <div style={{ background: "#0c0f0a", border: "1px solid #181e12", borderRadius: "4px", padding: "1.5rem" }}>
-                  <h3 style={{ color: "#fff", marginBottom: "1rem" }}>Рейтинг Amanita Network</h3>
-                  {Object.entries(TIERS).reverse().map(([t, info]) => (
-                    <div key={t} style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.6rem 0", borderBottom: "1px solid #181e12" }}>
-                      <span style={{ fontSize: "1.3rem" }}>{info.icon}</span>
-                      <span style={{ color: info.color, width: "90px" }}>{info.name}</span>
-                      <span style={{ color: "#b0a490", fontSize: "0.85rem" }}>от {info.min} токенов SHEVELEV</span>
-                    </div>
-                  ))}
-                </div>
+                ))}
               </div>
             )}
           </div>
         )}
 
+        {/* МОЯ СТРАНИЦА */}
         {page === "profile" && (
           <div>
-            <h2 style={{ color: "#fff" }}>👤 Моя страница</h2>
+            <h2 style={{ color: "#fff", marginBottom: "1.5rem", fontWeight: 900 }}>👤 Моя страница</h2>
             {!account
-              ? <div style={{ color: "#b0a490" }}>Подключите кошелёк для просмотра профиля.</div>
-              : <div style={{ background: "#0c0f0a", border: "1px solid #181e12", borderRadius: "4px", padding: "1.5rem" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
-                    <div style={{ fontSize: "3rem" }}>{tierInfo?.icon || "🌱"}</div>
+              ? <div style={{ ...styles.card, textAlign: "center", color: "#64748b" }}>
+                  <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🔒</div>
+                  <p>Подключите кошелёк для просмотра профиля</p>
+                  <button onClick={() => modal.open()} style={{ ...styles.btn, marginTop: "1rem" }}>Войти</button>
+                </div>
+              : <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <div style={{ ...styles.card, display: "flex", alignItems: "center", gap: "1.5rem" }}>
+                    <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: `linear-gradient(135deg, ${tierInfo?.color || "#9ca3af"}, #0f1117)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem" }}>{tierInfo?.icon || "🌱"}</div>
                     <div>
-                      <div style={{ color: "#fff", fontSize: "1.2rem" }}>{nickname || "Без ника"}</div>
-                      <div style={{ color: tierInfo?.color || "#6b7280" }}>{tierInfo?.name || "Зерно"}</div>
-                      <div style={{ color: "#b0a490", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} токенов SHEVELEV</div>
+                      <div style={{ color: "#fff", fontSize: "1.3rem", fontWeight: 700 }}>{nickname || "Без ника"}</div>
+                      <div style={{ color: tierInfo?.color || "#9ca3af", fontSize: "0.9rem" }}>{tierInfo?.name || "Зерно"}</div>
+                      <div style={{ color: "#64748b", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} токенов SHEVELEV</div>
                     </div>
                   </div>
-                  <div style={{ color: "#b0a490", fontSize: "0.8rem", wordBreak: "break-all" }}>{account}</div>
+                  <div style={styles.card}>
+                    <div style={{ color: "#64748b", fontSize: "0.75rem", marginBottom: "0.25rem" }}>Адрес кошелька</div>
+                    <div style={{ color: "#94a3b8", fontSize: "0.85rem", wordBreak: "break-all", fontFamily: "monospace" }}>{account}</div>
+                  </div>
                 </div>
             }
           </div>
@@ -292,59 +384,62 @@ export default function App() {
 
         {page === "feed" && (
           <div>
-            <h2 style={{ color: "#fff" }}>📝 Лента</h2>
-            <div style={{ background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", padding: "2rem", textAlign: "center", color: "#b0a490" }}>
-              🍄 Лента постов скоро появится...
+            <h2 style={{ color: "#fff", marginBottom: "1.5rem", fontWeight: 900 }}>📝 Лента</h2>
+            <div style={{ ...styles.card, textAlign: "center", color: "#64748b", padding: "3rem" }}>
+              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🍄</div>
+              <p>Лента постов скоро появится...</p>
             </div>
           </div>
         )}
 
         {page === "chats" && (
           <div>
-            <h2 style={{ color: "#fff" }}>💬 Чаты</h2>
-            <div style={{ background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", padding: "2rem", textAlign: "center", color: "#b0a490" }}>
-              🍄 Чаты скоро появятся...
+            <h2 style={{ color: "#fff", marginBottom: "1.5rem", fontWeight: 900 }}>💬 Чаты</h2>
+            <div style={{ ...styles.card, textAlign: "center", color: "#64748b", padding: "3rem" }}>
+              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🍄</div>
+              <p>Чаты скоро появятся...</p>
             </div>
           </div>
         )}
 
         {page === "create_chat" && (
           <div>
-            <h2 style={{ color: "#fff" }}>➕ Создать чат</h2>
-            <div style={{ background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", padding: "2rem", textAlign: "center", color: "#b0a490" }}>
-              🍄 Создание чатов скоро появится...
+            <h2 style={{ color: "#fff", marginBottom: "1.5rem", fontWeight: 900 }}>➕ Создать чат</h2>
+            <div style={{ ...styles.card, textAlign: "center", color: "#64748b", padding: "3rem" }}>
+              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🍄</div>
+              <p>Создание чатов скоро появится...</p>
             </div>
           </div>
         )}
 
         {page === "others" && (
           <div>
-            <h2 style={{ color: "#fff", marginBottom: "1rem" }}>👥 Другие участники</h2>
-            <div style={{ background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", padding: "1.5rem", marginBottom: "1.5rem" }}>
-              <h3 style={{ color: "#00c4a0", marginBottom: "1rem" }}>Как попасть в рейтинг?</h3>
+            <h2 style={{ color: "#fff", marginBottom: "1.5rem", fontWeight: 900 }}>👥 Другие участники</h2>
+            <div style={{ ...styles.card, marginBottom: "1.5rem" }}>
+              <h3 style={{ color: "#00c4a0", marginBottom: "1rem", fontSize: "0.95rem" }}>Как попасть в рейтинг?</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {[
-                  ["1.", "Установите MetaMask — расширение для браузера или приложение на телефон"],
-                  ["2.", "Добавьте сеть Decimal Smart Chain — при входе на сайт это произойдёт автоматически"],
-                  ["3.", "Получите токены SHEVELEV — чем больше токенов на кошельке, тем выше уровень"],
-                  ["4.", "Импортируйте токен SHEVELEV в MetaMask по адресу: 0xb5c1933b1fa015818ac2c53812f67611c48e6b56"]
+                  ["1", "Установите MetaMask — расширение для браузера или приложение на телефон"],
+                  ["2", "Добавьте сеть Decimal Smart Chain — при входе на сайт это произойдёт автоматически"],
+                  ["3", "Получите токены SHEVELEV — чем больше токенов на кошельке, тем выше уровень"],
+                  ["4", "Импортируйте токен SHEVELEV в MetaMask: 0xb5c1933b1fa015818ac2c53812f67611c48e6b56"]
                 ].map(([num, text]) => (
-                  <div key={num} style={{ display: "flex", gap: "0.75rem" }}>
-                    <span style={{ color: "#00c4a0" }}>{num}</span>
-                    <div style={{ color: "#b0a490", fontSize: "0.9rem" }}>{text}</div>
+                  <div key={num} style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+                    <span style={{ color: "#00c4a0", background: "rgba(0,196,160,0.1)", width: "24px", height: "24px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", flexShrink: 0 }}>{num}</span>
+                    <span style={{ color: "#94a3b8", fontSize: "0.9rem", lineHeight: 1.5 }}>{text}</span>
                   </div>
                 ))}
               </div>
             </div>
             {leaderboard.length === 0
-              ? <div style={{ textAlign: "center", color: "#b0a490" }}>Загрузка...</div>
+              ? <div style={{ textAlign: "center", color: "#64748b", padding: "2rem" }}>Загрузка...</div>
               : leaderboard.map((u, i) => (
-                <div key={i} style={{ background: "#0c0f0a", border: "1px solid #181e12", borderRadius: "4px", padding: "1rem", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-                  <div style={{ color: "#b0a490", width: "30px", textAlign: "center" }}>#{i+1}</div>
+                <div key={i} style={{ ...styles.card, marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "1rem" }} className="card-hover">
+                  <div style={{ color: "#64748b", width: "30px", textAlign: "center", fontSize: "0.85rem" }}>#{i+1}</div>
                   <div style={{ fontSize: "1.5rem" }}>{TIERS[u.tier]?.icon || "🌱"}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ color: TIERS[u.tier]?.color || "#6b7280" }}>{u.nickname || u.address.slice(0,8)+"..."}</div>
-                    <div style={{ color: "#b0a490", fontSize: "0.8rem" }}>{parseFloat(u.balance).toLocaleString()} токенов SHEVELEV</div>
+                    <div style={{ color: TIERS[u.tier]?.color || "#9ca3af", fontWeight: 700 }}>{u.nickname || u.address.slice(0,8)+"..."}</div>
+                    <div style={{ color: "#64748b", fontSize: "0.8rem" }}>{parseFloat(u.balance).toLocaleString()} токенов SHEVELEV</div>
                   </div>
                 </div>
               ))
@@ -354,19 +449,20 @@ export default function App() {
 
         {page === "disclaimer" && (
           <div>
-            <h2 style={{ color: "#fff", marginBottom: "1rem" }}>⚠️ Дисклеймер</h2>
-            <div style={{ background: "#0c0f0a", border: "1px solid #253018", borderRadius: "4px", padding: "1.5rem", color: "#b0a490", lineHeight: "1.8" }}>
-              <p>Amanita Network — открытая децентрализованная платформа для обмена личным опытом с Amanita muscaria исключительно в странах где это законно.</p>
-              <p>Платформа не занимается продажей, рекламой или пропагандой каких-либо веществ.</p>
-              <p>Перед любым использованием проконсультируйтесь с врачом.</p>
-              <p style={{ color: "#ef4444" }}>⛔ Запрещено для лиц до 18 лет.</p>
+            <h2 style={{ color: "#fff", marginBottom: "1.5rem", fontWeight: 900 }}>⚠️ Дисклеймер</h2>
+            <div style={{ ...styles.card, lineHeight: 1.8 }}>
+              <p style={{ color: "#94a3b8", marginBottom: "1rem" }}>Amanita Network — открытая децентрализованная платформа для обмена личным опытом с Amanita muscaria исключительно в странах где это законно.</p>
+              <p style={{ color: "#94a3b8", marginBottom: "1rem" }}>Платформа не занимается продажей, рекламой или пропагандой каких-либо веществ.</p>
+              <p style={{ color: "#94a3b8", marginBottom: "1rem" }}>Перед любым использованием проконсультируйтесь с врачом.</p>
+              <p style={{ color: "#f87171", fontWeight: 700 }}>⛔ Запрещено для лиц до 18 лет.</p>
             </div>
           </div>
         )}
 
       </div>
 
-      <div style={{ textAlign: "center", padding: "1rem", color: "#253018", fontSize: "0.7rem", borderTop: "1px solid #181e12", marginTop: "2rem" }}>
+      {/* FOOTER */}
+      <div style={{ textAlign: "center", padding: "1.5rem", color: "#334155", fontSize: "0.75rem", borderTop: "1px solid rgba(255,255,255,0.04)", position: "relative", zIndex: 1 }}>
         ⚠️ Только для легального личного опыта · Не реклама · Не продажа · Консультируйтесь с врачом
       </div>
     </div>
