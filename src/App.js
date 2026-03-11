@@ -24,7 +24,10 @@ const modal = createAppKit({
 const REPUTATION_ADDRESS = "0xdb62AD6F2f4bb1c5D230aCeaCb937530746C5e13";
 const SHEVELEV_ADDRESS = "0xb5c1933b1fa015818ac2c53812f67611c48e6b56";
 const REPUTATION_ABI = ["function getTier(address) view returns (uint8)"];
-const SHEVELEV_ABI = ["function balanceOf(address) view returns (uint256)"];
+const SHEVELEV_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)"
+];
 
 const TIERS = {
   1: { name: "Зерно", icon: "🌱", color: "#9ca3af" },
@@ -243,6 +246,64 @@ function PostCard({ post, account, onReload, isOwner }) {
   );
 }
 
+function SendTokensModal({ toAddress, toNickname, account, onClose }) {
+  const [amount, setAmount] = useState("");
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function sendTokens() {
+    if (!amount || parseFloat(amount) <= 0) return;
+    setSending(true);
+    try {
+      const walletProvider = modal.getWalletProvider();
+      const provider = new ethers.BrowserProvider(walletProvider);
+      const signer = await provider.getSigner();
+      const shev = new ethers.Contract(SHEVELEV_ADDRESS, SHEVELEV_ABI, signer);
+      const tx = await shev.transfer(toAddress, ethers.parseEther(amount));
+      await tx.wait();
+      setDone(true);
+    } catch (e) {
+      alert("Ошибка: " + e.message);
+    }
+    setSending(false);
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+      <div style={{ ...S.card, maxWidth: "400px", width: "100%" }}>
+        <h3 style={{ color: "#fff", marginBottom: "1rem" }}>🪙 Отправить SHEVELEV</h3>
+        {done ? (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>✅</div>
+            <div style={{ color: "#4ade80", marginBottom: "1rem" }}>Токены отправлены!</div>
+            <button onClick={onClose} style={S.btn}>Закрыть</button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ color: "#94a3b8", fontSize: "0.85rem", marginBottom: "1rem" }}>
+              Получатель: <span style={{ color: "#00c4a0" }}>{toNickname || toAddress.slice(0,12)+"..."}</span>
+            </div>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              placeholder="Количество SHEVELEV..."
+              style={{ ...S.input, marginBottom: "1rem" }}
+              min="0"
+            />
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button onClick={sendTokens} disabled={sending} style={{ ...S.btn, flex: 1 }}>
+                {sending ? "Отправка..." : "Отправить"}
+              </button>
+              <button onClick={onClose} style={S.btnSm}>Отмена</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function UserPage({ address, account, myVotes, onVote, onBack }) {
   const [user, setUser] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -250,6 +311,7 @@ function UserPage({ address, account, myVotes, onVote, onBack }) {
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [tier, setTier] = useState(null);
   const [balance, setBalance] = useState(null);
+  const [showSendTokens, setShowSendTokens] = useState(false);
 
   useEffect(() => { loadData(); }, [address]);
 
@@ -284,6 +346,15 @@ function UserPage({ address, account, myVotes, onVote, onBack }) {
 
   return (
     <div>
+      {showSendTokens && (
+        <SendTokensModal
+          toAddress={address}
+          toNickname={user.nickname}
+          account={account}
+          onClose={() => setShowSendTokens(false)}
+        />
+      )}
+
       <button onClick={onBack} style={{ ...S.btnSm, marginBottom: "1rem" }}>← Назад</button>
       <div style={S.card}>
         <div style={{ display: "flex", gap: "1.5rem", alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -306,12 +377,18 @@ function UserPage({ address, account, myVotes, onVote, onBack }) {
             <div style={{ marginTop: "0.5rem", color: "#64748b", fontSize: "0.85rem" }}>{parseFloat(balance || 0).toLocaleString()} SHEVELEV</div>
           </div>
           {!isMe && account && (
-            <button onClick={() => onVote(address, hasVoted)} style={{ ...S.btnSm, borderColor: hasVoted ? "#fbbf24" : "rgba(255,255,255,0.1)", color: hasVoted ? "#fbbf24" : "#e2e8f0" }}>
-              {hasVoted ? "⭐ Голос дан" : "⭐ Голосовать"}
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <button onClick={() => onVote(address, hasVoted)} style={{ ...S.btnSm, borderColor: hasVoted ? "#fbbf24" : "rgba(255,255,255,0.1)", color: hasVoted ? "#fbbf24" : "#e2e8f0" }}>
+                {hasVoted ? "⭐ Голос дан" : "⭐ Голосовать"}
+              </button>
+              <button onClick={() => setShowSendTokens(true)} style={{ ...S.btn, fontSize: "0.8rem", padding: "0.4rem 0.9rem" }}>
+                🪙 Отправить SHEVELEV
+              </button>
+            </div>
           )}
         </div>
       </div>
+
       <div style={{ ...S.card, marginTop: "1rem" }}>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
           <button onClick={() => loadPostsByFolder(null)} style={{ ...S.btnSm, borderColor: !selectedFolder ? "#00c4a0" : "rgba(255,255,255,0.1)", color: !selectedFolder ? "#00c4a0" : "#e2e8f0" }}>Все</button>
@@ -417,12 +494,8 @@ export default function App() {
     try {
       const r = await fetch(`${API}/api/users`);
       const users = await r.json();
-
-      // Топ по голосам
       const byVotes = [...users].sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0)).slice(0, 5);
       setTopByVotes(byVotes);
-
-      // Топ по токенам — загружаем балансы
       const provider = new ethers.JsonRpcProvider("https://node.decimalchain.com/web3/");
       const shev = new ethers.Contract(SHEVELEV_ADDRESS, SHEVELEV_ABI, provider);
       const withBalances = await Promise.all(users.map(async u => {
@@ -431,8 +504,7 @@ export default function App() {
           return { ...u, shevelev: parseFloat(ethers.formatEther(bal)) };
         } catch { return { ...u, shevelev: 0 }; }
       }));
-      const byTokens = [...withBalances].sort((a, b) => b.shevelev - a.shevelev).slice(0, 5);
-      setTopByTokens(byTokens);
+      setTopByTokens([...withBalances].sort((a, b) => b.shevelev - a.shevelev).slice(0, 5));
     } catch (e) { console.error(e); }
   }
 
@@ -564,14 +636,12 @@ export default function App() {
                 Amanita<br/><span style={{ background: "linear-gradient(135deg,#00c4a0,#0099cc)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Network</span>
               </h1>
               <p style={{ color: "#94a3b8", fontSize: "1.1rem", maxWidth: "400px", margin: "0 auto 1.5rem" }}>Открытая децентрализованная сеть для обмена опытом</p>
-
               <div style={{ display: "inline-flex", alignItems: "center", background: "rgba(0,196,160,0.08)", border: "1px solid rgba(0,196,160,0.2)", borderRadius: "16px", padding: "1.2rem 2.5rem", marginBottom: "1.5rem" }}>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: "2.8rem", fontWeight: 900, color: "#00c4a0", lineHeight: 1 }}>{displayCount}</div>
                   <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "0.3rem" }}>участников в сети</div>
                 </div>
               </div>
-
               {!account && (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
                   <button onClick={() => modal.open()} style={{ ...S.btn, padding: "0.9rem 2.5rem", fontSize: "1rem", borderRadius: "12px", boxShadow: "0 0 30px rgba(0,196,160,0.3)" }}>🦊 Войти через MetaMask</button>
@@ -592,19 +662,14 @@ export default function App() {
               </div>
             )}
 
-            {/* РЕЙТИНГИ */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
-
-              {/* ТОП ПО ТОКЕНАМ */}
               <div style={S.card}>
-                <h3 style={{ color: "#fbbf24", marginBottom: "1rem", fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  🪙 Топ по токенам SHEVELEV
-                </h3>
+                <h3 style={{ color: "#fbbf24", marginBottom: "1rem", fontSize: "0.95rem" }}>🪙 Топ по токенам SHEVELEV</h3>
                 {topByTokens.length === 0
                   ? <div style={{ color: "#64748b", fontSize: "0.85rem", textAlign: "center", padding: "1rem" }}>Загрузка...</div>
                   : topByTokens.map((u, i) => (
                     <div key={u.address} onClick={() => { setViewingUser(u.address); navigate("others"); }} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.6rem 0", borderBottom: i < topByTokens.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none", cursor: "pointer" }}>
-                      <span style={{ color: i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7f32" : "#64748b", fontWeight: 700, width: "20px", fontSize: "0.9rem" }}>#{i+1}</span>
+                      <span style={{ color: i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7f32" : "#64748b", fontWeight: 700, width: "20px" }}>#{i+1}</span>
                       <span style={{ fontSize: "1.2rem" }}>{AVATARS[u.avatar_index || 0]?.emoji}</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ color: "#fff", fontSize: "0.85rem", fontWeight: 700 }}>{u.nickname || u.address.slice(0,8)+"..."}</div>
@@ -615,16 +680,13 @@ export default function App() {
                 }
               </div>
 
-              {/* ТОП ПО ГОЛОСАМ */}
               <div style={S.card}>
-                <h3 style={{ color: "#c084fc", marginBottom: "1rem", fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  ⭐ Топ по голосам
-                </h3>
+                <h3 style={{ color: "#c084fc", marginBottom: "1rem", fontSize: "0.95rem" }}>⭐ Топ по голосам</h3>
                 {topByVotes.length === 0
                   ? <div style={{ color: "#64748b", fontSize: "0.85rem", textAlign: "center", padding: "1rem" }}>Загрузка...</div>
                   : topByVotes.map((u, i) => (
                     <div key={u.address} onClick={() => { setViewingUser(u.address); navigate("others"); }} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.6rem 0", borderBottom: i < topByVotes.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none", cursor: "pointer" }}>
-                      <span style={{ color: i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7f32" : "#64748b", fontWeight: 700, width: "20px", fontSize: "0.9rem" }}>#{i+1}</span>
+                      <span style={{ color: i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7f32" : "#64748b", fontWeight: 700, width: "20px" }}>#{i+1}</span>
                       <span style={{ fontSize: "1.2rem" }}>{AVATARS[u.avatar_index || 0]?.emoji}</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ color: "#fff", fontSize: "0.85rem", fontWeight: 700 }}>{u.nickname || u.address.slice(0,8)+"..."}</div>
@@ -819,4 +881,3 @@ export default function App() {
     </div>
   );
 }
-
